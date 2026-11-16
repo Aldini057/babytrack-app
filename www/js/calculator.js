@@ -105,9 +105,19 @@ window.BabyCalc = (() => {
     return desiredElapsed - baseElapsed;
   }
 
+  function formatGestationalAge(weeks, days) {
+    const w = Number(weeks || 0);
+    const d = Number(days || 0);
+    const wLabel = w === 1 ? '1 semana' : `${w} semanas`;
+    if (d === 0) return w === 1 ? '1 semana exacta' : `${w} semanas exactas`;
+    if (d === 1) return `${wLabel} y 1 día`;
+    return `${wLabel} y ${d} días`;
+  }
+
   return {
     localIsoDate,
     calculateMetrics,
-    calculateOffsetFromWeeksDays
+    calculateOffsetFromWeeksDays,
+    formatGestationalAge
   };
 })();

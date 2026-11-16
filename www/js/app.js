@@ -23,10 +23,17 @@ function babyTrackApp() {
     showBookModal: false,
     showTipModal: false,
     showFamilyModal: false,
+    showShareCardModal: false,
     showChecklistModal: false,
     showJournalModal: false,
     showMomentModal: false,
     viewerItem: null,
+
+    // Tarjeta visual de WhatsApp
+    shareCardIncludeEco: true,
+    shareCardPreviewUrl: '',
+    shareCardText: '',
+    shareCardBusy: false,
 
     // Formularios
     calibrateForm: { dueDate: '', currentWeeks: 6, currentDays: 0, momBloodType: '', allergiesNotes: '', pinEnabled: false, pinCode: '1419', babyNickname: '', momName: '', dadName: '' },
@@ -60,6 +67,11 @@ function babyTrackApp() {
       this.studyForm.studyDate = today;
       this.momentForm.momentDate = today;
       this.loaded = true;
+
+      this.$watch('hideAdsForEthics', () => this.syncAdBanner());
+      this.$watch('locked', () => this.syncAdBanner());
+      this.$watch('showOnboarding', () => this.syncAdBanner());
+      await this.syncAdBanner();
     },
 
     async persist() {
@@ -87,6 +99,14 @@ function babyTrackApp() {
       );
     },
 
+    get formattedAge() {
+      return BabyCalc.formatGestationalAge(this.metrics.weeks, this.metrics.days);
+    },
+
+    get isNativeApp() {
+      return !!(window.BabyNative && window.BabyNative.isNative());
+    },
+
     get activeMilestonePrompt() {
       const w = this.metrics.weeks;
       const dismissed = this.state.settings.dismissedMilestones || [];
@@ -97,11 +117,21 @@ function babyTrackApp() {
     },
 
     get hideAdsForEthics() {
-      // Regla de oro ética: nunca mostrar banner en Modo Consulta Médica, Cronómetro de Contracciones o si ya se desbloqueó
+      // Regla de oro ética: nunca mostrar banner en Modo Consulta Médica, Cronómetro de Contracciones, Onboarding/PIN o si ya se desbloqueó
       if (this.state.settings.adsRemoved || this.state.settings.premiumBookUnlocked) return true;
+      if (this.locked || this.showOnboarding) return true;
       if (this.showConsultationDrawer) return true;
       if (this.activeTab === 'medico' && this.medicalSubTab === 'bienestar' && this.contractionTimer.active) return true;
       return false;
+    },
+
+    async syncAdBanner() {
+      if (!this.isNativeApp) return;
+      if (this.hideAdsForEthics) {
+        await window.BabyNative.hideBanner();
+      } else {
+        await window.BabyNative.showBanner(window.BabyMonetization?.ADMOB_TEST_BANNER_ANDROID);
+      }
     },
 
     unlockWithPin() {
@@ -574,14 +604,53 @@ function babyTrackApp() {
       this.notify('Momento agregado al álbum.');
     },
 
-    // --- HÍBRIDO FAMILIAR (WHATSAPP + CLOUD RUN LINK) ---
+    // --- HÍBRIDO FAMILIAR (TARJETA PNG + WHATSAPP + CLOUD RUN LINK) ---
+    get latestUltrasoundImage() {
+      const ecos = this.ultrasounds || [];
+      for (const eco of ecos) {
+        const img = (eco.attachments || []).find(a => a.fileCategory === 'IMAGE' && a.dataUrl);
+        if (img) return img.dataUrl;
+      }
+      return null;
+    },
+
     get whatsappShareUrl() {
-      const m = this.metrics;
-      const s = this.state.settings;
-      const cloudUrl = (s.familyCloudEndpoint || '').trim();
-      const linkLine = cloudUrl ? `\n\nMira los ecos y déjanos una cartita privada aquí: ${cloudUrl}` : '';
-      const msg = `¡Hola familia! Ya cumplimos ${m.weeks} semanas y ${m.days} días de embarazo (${m.progressPercent}%).\nNuestro ${s.babyNickname} ya tiene el tamaño de: ${m.sizeEmoji} ${m.sizeComparison} (${m.sizeWeight}).${linkLine}\n\nSeguimiento con BabyTrack`;
+      const msg = BabyShareCard.buildWhatsAppText(this.state.settings, this.metrics);
       return `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    },
+
+    async openShareCardModal() {
+      this.shareCardIncludeEco = !!this.latestUltrasoundImage;
+      this.showShareCardModal = true;
+      await this.refreshShareCardPreview();
+    },
+
+    async refreshShareCardPreview() {
+      this.shareCardBusy = true;
+      try {
+        const ecoUrl = this.shareCardIncludeEco ? this.latestUltrasoundImage : null;
+        this.shareCardText = BabyShareCard.buildWhatsAppText(this.state.settings, this.metrics);
+        this.shareCardPreviewUrl = await BabyShareCard.generateShareCardDataUrl(
+          this.state.settings,
+          this.metrics,
+          ecoUrl
+        );
+      } finally {
+        this.shareCardBusy = false;
+      }
+    },
+
+    async shareCardNative() {
+      if (!this.shareCardPreviewUrl) await this.refreshShareCardPreview();
+      const res = await window.BabyNative.shareImageAndText({
+        title: `BabyTrack · ${this.state.settings.babyNickname}`,
+        text: this.shareCardText,
+        dataUrl: this.shareCardPreviewUrl,
+        fileName: `babytrack-semana-${this.metrics.weeks}.png`
+      });
+      if (res?.ok) {
+        this.notify(res.mode === 'native' ? 'Elige WhatsApp para enviar imagen y texto.' : 'Tarjeta PNG descargada y texto listo para WhatsApp.');
+      }
     },
 
     async saveFamilyNoteLocal() {

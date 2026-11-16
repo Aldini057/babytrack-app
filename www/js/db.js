@@ -125,6 +125,9 @@ window.BabyDB = (() => {
   }
 
   function amazonAffiliateUrl(item) {
+    if (window.BabyMonetization && typeof window.BabyMonetization.getAmazonAffiliateUrl === 'function') {
+      return window.BabyMonetization.getAmazonAffiliateUrl(item);
+    }
     const q = encodeURIComponent(item.amazonQuery || item.itemName || 'bebe');
     return `https://www.amazon.com.mx/s?k=${q}&tag=babytrackmx-20`;
   }

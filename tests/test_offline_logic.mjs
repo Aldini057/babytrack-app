@@ -22,7 +22,7 @@ function loadBrowserScripts() {
   };
   sandbox.window = sandbox;
 
-  for (const fname of ['calculator.js', 'calendar.js', 'db.js', 'export_pdf.js']) {
+  for (const fname of ['calculator.js', 'calendar.js', 'payments.js', 'db.js', 'share_card.js', 'export_pdf.js']) {
     const code = fs.readFileSync(path.join(wwwJsDir, fname), 'utf-8');
     vm.runInNewContext(code, sandbox, { filename: fname });
   }
@@ -38,13 +38,50 @@ test('BabyCalc calculates exact 280-day gestational age and fruit size', () => {
   assert.match(m.sizeComparison, /Arándano/);
 });
 
-test('BabyDB provides starter checklist with Amazon MX affiliate links', () => {
-  const { BabyDB } = loadBrowserScripts();
+test('BabyCalc.formatGestationalAge removes 0-day redundancy and pluralizes properly', () => {
+  const { BabyCalc } = loadBrowserScripts();
+  assert.equal(BabyCalc.formatGestationalAge(10, 0), '10 semanas exactas');
+  assert.equal(BabyCalc.formatGestationalAge(1, 0), '1 semana exacta');
+  assert.equal(BabyCalc.formatGestationalAge(10, 1), '10 semanas y 1 día');
+  assert.equal(BabyCalc.formatGestationalAge(10, 3), '10 semanas y 3 días');
+});
+
+test('BabyShareCard.buildWhatsAppText formats rich message without 0 días redundancy', () => {
+  const { BabyShareCard } = loadBrowserScripts();
+  const text = BabyShareCard.buildWhatsAppText(
+    {
+      babyNickname: 'Santi',
+      genderMode: 'BOY',
+      dueDate: '2027-07-07',
+      momName: 'Ana',
+      dadName: 'Luis',
+      familyCloudEndpoint: 'https://babytrack.run.app/familia'
+    },
+    {
+      weeks: 10,
+      days: 0,
+      trimesterName: '1er Trimestre',
+      progressPercent: 25.0,
+      sizeEmoji: '🍓',
+      sizeComparison: 'Fresa',
+      sizeWeight: '3.1 cm · 4 g',
+      daysRemaining: 210
+    }
+  );
+  assert.match(text, /10 semanas exactas/);
+  assert.doesNotMatch(text, /\b0 días/);
+  assert.match(text, /¡Es un niño!/);
+  assert.match(text, /https:\/\/babytrack\.run\.app\/familia/);
+});
+
+test('BabyMonetization & BabyDB provide Amazon MX affiliate links and Play Billing catalog', () => {
+  const { BabyDB, BabyMonetization } = loadBrowserScripts();
   const state = BabyDB.createDefaultState();
   assert.ok(state.checklist.length >= 16);
   const url = BabyDB.amazonAffiliateUrl(state.checklist[0]);
   assert.match(url, /^https:\/\/www\.amazon\.com\.mx\/s\?k=/);
-  assert.match(url, /tag=babytrackmx-20/);
+  assert.match(url, new RegExp(`tag=${BabyMonetization.AMAZON_MX_TAG}`));
+  assert.equal(BabyMonetization.PLAY_PRODUCTS.BOOK_UNLOCK.priceMxn, 49);
 });
 
 test('BabyCalendar builds Google Calendar URL and .ics with 24h and 2h VALARM', () => {

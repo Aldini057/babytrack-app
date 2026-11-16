@@ -8,8 +8,11 @@
   <script src="js/calculator.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/calendar.js"></script>
+  <script src="js/payments.js"></script>
   <script src="js/db.js"></script>
+  <script src="js/share_card.js"></script>
   <script src="js/export_pdf.js"></script>
+  <script src="vendor/native_bridge.js"></script>
   <script src="js/app.js"></script>
   <script defer src="vendor/alpine.min.js"></script>
 </head>
@@ -75,6 +78,7 @@
         </div>
       </div>
       <div class="flex items-center space-x-1.5">
+        <button x-show="!state.settings.adsRemoved" @click="showTipModal = true" class="px-2.5 py-1 rounded-full text-[11px] font-bold border border-amber-200 bg-amber-50 text-amber-800">☕ Apoyar</button>
         <button @click="toggleActiveParent()" class="px-2.5 py-1 rounded-full text-[11px] font-bold border border-theme bg-theme-primary-light text-theme-primary">
           <span x-text="state.settings.activeParent === 'MAMA' ? '👩 Mamá' : '👨 Papá'"></span>
         </button>
@@ -107,9 +111,16 @@
 
         <div class="flex items-baseline space-x-2">
           <span class="text-4xl font-black text-theme-primary" x-text="metrics.weeks"></span>
-          <span class="text-sm font-bold text-gray-700">semanas</span>
-          <span class="text-2xl font-black text-gray-800" x-text="'+' + metrics.days"></span>
-          <span class="text-xs font-bold text-gray-500">días</span>
+          <span class="text-sm font-bold text-gray-700" x-text="metrics.weeks === 1 ? 'semana' : 'semanas'"></span>
+          <template x-if="metrics.days === 0">
+            <span class="px-2 py-0.5 rounded-full bg-theme-primary-light text-theme-primary text-xs font-extrabold">exactas</span>
+          </template>
+          <template x-if="metrics.days > 0">
+            <span class="flex items-baseline space-x-1">
+              <span class="text-2xl font-black text-gray-800" x-text="'+' + metrics.days"></span>
+              <span class="text-xs font-bold text-gray-500" x-text="metrics.days === 1 ? 'día' : 'días'"></span>
+            </span>
+          </template>
         </div>
 
         <!-- Barra de progreso -->
@@ -133,19 +144,6 @@
         </div>
       </div>
 
-      <!-- Tarjeta Hito Emocional (Tarro de Propinas solo en Sem 12, 24 y 40) -->
-      <div x-show="activeMilestonePrompt" class="bg-amber-50 border-2 border-amber-300 rounded-3xl p-4 space-y-2">
-        <div class="flex justify-between items-start">
-          <p class="text-xs font-black text-amber-900" x-text="'🎉 ' + (activeMilestonePrompt?.title || '')"></p>
-          <button @click="dismissMilestone(activeMilestonePrompt.week)" class="text-xs text-amber-700 font-bold">&times;</button>
-        </div>
-        <p class="text-[11px] text-amber-800" x-text="activeMilestonePrompt?.text"></p>
-        <div class="flex gap-2">
-          <button @click="showTipModal = true" class="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-bold">☕ Apoyar Proyecto</button>
-          <button @click="showBookModal = true" class="px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-amber-900 text-xs font-bold">📖 Ver Libro de Oro</button>
-        </div>
-      </div>
-
       <!-- Modo Consulta Médica en 1 toque -->
       <button @click="showConsultationDrawer = true" class="w-full bg-theme-primary text-white rounded-2xl p-4 shadow-theme flex items-center justify-between">
         <div class="flex items-center space-x-3 text-left">
@@ -158,17 +156,17 @@
         <span class="text-xs font-bold bg-white/20 px-2.5 py-1 rounded-full">Abrir →</span>
       </button>
 
-      <!-- Híbrido Familiar: WhatsApp + Espejo /familia -->
+      <!-- Híbrido Familiar: Tarjeta Visual WhatsApp + Espejo /familia -->
       <div class="bg-white rounded-2xl p-4 border border-theme shadow-sm space-y-2.5">
         <div class="flex items-center space-x-2.5">
           <div class="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-xl">👨‍👩‍👧‍👦</div>
           <div>
             <h3 class="text-sm font-extrabold text-gray-900">Compartir con Familia y Amigos</h3>
-            <p class="text-[11px] text-gray-500">Envía actualización por WhatsApp o configura tu enlace web `/familia`</p>
+            <p class="text-[11px] text-gray-500">Genera tarjeta con imagen + eco por WhatsApp o enlace `/familia`</p>
           </div>
         </div>
         <div class="grid grid-cols-2 gap-2">
-          <a :href="whatsappShareUrl" target="_blank" class="py-2 px-3 rounded-xl bg-emerald-600 text-white text-xs font-bold text-center">📲 Enviar por WhatsApp</a>
+          <button @click="openShareCardModal()" class="py-2 px-3 rounded-xl bg-emerald-600 text-white text-xs font-bold text-center">📲 Tarjeta WhatsApp</button>
           <button @click="showFamilyModal = true" class="py-2 px-3 rounded-xl bg-gray-100 text-gray-800 text-xs font-bold">⚙️ Configurar Link Web</button>
         </div>
       </div>
@@ -511,12 +509,12 @@
 
   </main>
 
-  <!-- BANNER INFERIOR ÉTICO (AdMob Placeholder — Se oculta en Modo Consulta y Contracciones) -->
-  <div x-show="!hideAdsForEthics" x-cloak class="fixed bottom-16 left-0 right-0 z-20 max-w-lg mx-auto px-3">
+  <!-- BANNER INFERIOR ÉTICO (AdMob real en Android; vista previa discreta en navegador) -->
+  <div x-show="!hideAdsForEthics && !isNativeApp" x-cloak class="fixed bottom-16 left-0 right-0 z-20 max-w-lg mx-auto px-3">
     <div class="bg-white/95 border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm flex items-center justify-between text-[10px]">
       <div class="flex items-center space-x-2">
         <span class="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-bold">Anuncio</span>
-        <span class="text-gray-600 font-medium">Espacio banner discreto (AdMob)</span>
+        <span class="text-gray-600 font-medium">Banner discreto AdMob (en APK Android)</span>
       </div>
       <button @click="showBookModal = true" class="text-theme-primary font-bold underline">Quitar con Libro $49</button>
     </div>
@@ -542,7 +540,7 @@
       <div class="bg-theme-primary text-white px-5 py-4 flex justify-between items-center">
         <div>
           <h3 class="text-base font-extrabold">🩺 Modo Consulta Médica</h3>
-          <p class="text-xs opacity-90" x-text="metrics.weeks + ' sem + ' + metrics.days + ' días · ' + metrics.trimesterName"></p>
+          <p class="text-xs opacity-90" x-text="formattedAge + ' · ' + metrics.trimesterName"></p>
         </div>
         <button @click="showConsultationDrawer = false" class="text-2xl font-bold">&times;</button>
       </div>
@@ -640,6 +638,27 @@
       <p class="text-gray-600">Si tienes tu página pública `/familia` desplegada en la nube, pégala aquí para incluirla automáticamente al enviar tarjetas por WhatsApp:</p>
       <input type="url" x-model="state.settings.familyCloudEndpoint" placeholder="https://tu-app.run.app/familia" class="w-full px-3 py-2 border rounded-xl">
       <button @click="persist(); showFamilyModal = false; notify('Enlace familiar guardado.')" class="w-full py-2.5 bg-theme-primary text-white rounded-xl font-bold">Guardar Enlace</button>
+    </div>
+  </div>
+
+  <!-- Modal Tarjeta Visual WhatsApp (PNG 1080x1080 + Texto Enriquecido) -->
+  <div x-show="showShareCardModal" x-cloak class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+    <div @click.outside="showShareCardModal = false" class="bg-white rounded-3xl max-w-md w-full p-5 space-y-3 max-h-[90vh] overflow-y-auto text-xs">
+      <div class="flex justify-between items-center">
+        <h3 class="text-sm font-black text-gray-900">📲 Tarjeta Visual para WhatsApp</h3>
+        <button @click="showShareCardModal = false" class="text-xl font-bold text-gray-400">&times;</button>
+      </div>
+      <div class="bg-gray-50 rounded-2xl p-2 border border-theme flex items-center justify-center min-h-[200px]">
+        <img x-show="shareCardPreviewUrl" :src="shareCardPreviewUrl" class="w-full rounded-xl shadow-sm" alt="Vista previa de tarjeta">
+        <p x-show="shareCardBusy && !shareCardPreviewUrl" class="text-gray-400 font-bold">Generando tarjeta...</p>
+      </div>
+      <label x-show="latestUltrasoundImage" class="flex items-center space-x-2 bg-purple-50 p-2.5 rounded-xl border border-purple-200 font-bold text-purple-900 cursor-pointer">
+        <input type="checkbox" x-model="shareCardIncludeEco" @change="refreshShareCardPreview()">
+        <span>👶 Incluir foto del último ultrasonido</span>
+      </label>
+      <div class="bg-emerald-50/60 border border-emerald-200 rounded-xl p-2.5 text-[11px] text-gray-700 whitespace-pre-line max-h-32 overflow-y-auto" x-text="shareCardText"></div>
+      <button @click="shareCardNative()" class="w-full py-3 rounded-2xl bg-emerald-600 text-white text-xs font-extrabold shadow">🚀 Compartir Imagen + Texto en WhatsApp</button>
+      <button @click="showShareCardModal = false" class="w-full py-1.5 text-xs text-gray-400 font-bold">Cerrar</button>
     </div>
   </div>
 
