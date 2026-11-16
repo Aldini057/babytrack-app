@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BabyTrack</string>
+    <string name="title_activity_main">BabyTrack</string>
+    <string name="package_name">com.babytrack.app</string>
+    <string name="custom_url_scheme">com.babytrack.app</string>
+</resources>

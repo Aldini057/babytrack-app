@@ -1,0 +1,12 @@
+{
+  "appId": "com.babytrack.app",
+  "appName": "BabyTrack",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#FFF9F3"
+  }
+}

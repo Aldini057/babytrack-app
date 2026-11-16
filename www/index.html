@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>BabyTrack — Control Prenatal y Recuerdos</title>
+  <link rel="stylesheet" href="vendor/tailwind.css">
+  <script src="js/calculator.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/export_pdf.js"></script>
+  <script src="js/app.js"></script>
+  <script defer src="vendor/alpine.min.js"></script>
+</head>
+<body data-theme="SURPRISE" class="bg-theme-app min-h-screen antialiased select-none" x-data="babyTrackApp()" x-init="init()">
+
+  <!-- Toast de confirmación -->
+  <div x-show="toastMessage" x-cloak class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg" x-text="toastMessage"></div>
+
+  <!-- BLOQUEO POR PIN (Opcional activado por el usuario) -->
+  <div x-show="locked" x-cloak class="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-xs w-full p-6 shadow-2xl space-y-4 text-center">
+      <div class="text-4xl">🔐</div>
+      <h2 class="text-base font-extrabold text-gray-900">BabyTrack Bloqueado</h2>
+      <p class="text-xs text-gray-500">Ingresa tu PIN familiar para abrir tus datos privados.</p>
+      <form @submit.prevent="unlockWithPin()" class="space-y-3">
+        <input type="password" inputmode="numeric" maxlength="10" x-model="pinInput" placeholder="PIN" class="w-full px-4 py-2.5 border rounded-xl text-center text-lg font-black tracking-[0.35em]">
+        <p x-show="pinError" class="text-xs font-bold text-red-600" x-text="pinError"></p>
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-theme-primary text-white text-xs font-extrabold shadow">Desbloquear</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ONBOARDING INICIAL (1ra vez en el teléfono) -->
+  <div x-show="showOnboarding" x-cloak class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="text-center space-y-1">
+        <div class="text-4xl">🍼</div>
+        <h2 class="text-lg font-black text-gray-900">Bienvenidos a BabyTrack</h2>
+        <p class="text-xs text-gray-500">Privacidad 100% local en tu teléfono. Tus datos y fotos nunca salen de aquí sin tu permiso.</p>
+      </div>
+      <form @submit.prevent="completeOnboarding()" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Apodo o Nombre del Bebé</label>
+          <input type="text" x-model="calibrateForm.babyNickname" required placeholder="Ej. Nuestro Bebé / Santi / Sofi" class="w-full px-3 py-2 border rounded-xl text-sm">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Nombre de Mamá</label>
+            <input type="text" x-model="calibrateForm.momName" required class="w-full px-3 py-2 border rounded-xl text-xs">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Nombre de Papá</label>
+            <input type="text" x-model="calibrateForm.dadName" required class="w-full px-3 py-2 border rounded-xl text-xs">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Fecha Probable de Parto (FPP)</label>
+          <input type="date" x-model="calibrateForm.dueDate" required class="w-full px-3 py-2 border rounded-xl text-sm">
+        </div>
+        <button type="submit" class="w-full py-3 rounded-2xl bg-theme-primary text-white text-sm font-extrabold shadow-theme">Comenzar Seguimiento →</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- CABECERA SUPERIOR -->
+  <header class="sticky top-0 z-30 bg-theme-surface/95 backdrop-blur-md border-b border-theme pt-safe">
+    <div class="max-w-lg mx-auto px-4 py-2.5 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <div class="w-9 h-9 rounded-2xl bg-theme-primary-light flex items-center justify-center border border-theme text-xl">🍼</div>
+        <div>
+          <h1 class="text-base font-extrabold tracking-tight leading-none text-gray-900">BabyTrack</h1>
+          <p class="text-[10px] font-semibold text-theme-muted mt-0.5">100% Privado en tu Teléfono</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-1.5">
+        <button @click="toggleActiveParent()" class="px-2.5 py-1 rounded-full text-[11px] font-bold border border-theme bg-theme-primary-light text-theme-primary">
+          <span x-text="state.settings.activeParent === 'MAMA' ? '👩 Mamá' : '👨 Papá'"></span>
+        </button>
+        <button @click="openCalibrate()" class="px-2.5 py-1 rounded-full text-[11px] font-bold border border-theme bg-white text-gray-700">⚙️</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="max-w-lg mx-auto px-4 py-4 space-y-4" :class="hideAdsForEthics ? 'pb-24' : 'pb-36'">
+
+    <!-- ================================================================== -->
+    <!-- TAB 1: INICIO                                                      -->
+    <!-- ================================================================== -->
+    <section x-show="activeTab === 'inicio'" class="space-y-4">
+
+      <!-- Hero Counter Obstétrico -->
+      <div class="bg-theme-surface rounded-3xl p-5 border border-theme shadow-theme space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-theme-primary-light text-theme-primary" x-text="metrics.trimesterName"></span>
+            <h2 class="text-xl font-black text-gray-900 mt-1" x-text="state.settings.babyNickname"></h2>
+            <p class="text-xs text-theme-muted">FPP: <strong x-text="state.settings.dueDate"></strong> · Faltan <strong x-text="metrics.daysRemaining"></strong> días</p>
+          </div>
+          <div class="text-center bg-theme-primary-light border border-theme rounded-2xl px-3.5 py-2">
+            <div class="text-3xl" x-text="metrics.sizeEmoji"></div>
+            <p class="text-[10px] font-bold text-theme-primary" x-text="metrics.progressPercent + '%'"></p>
+          </div>
+        </div>
+
+        <div class="flex items-baseline space-x-2">
+          <span class="text-4xl font-black text-theme-primary" x-text="metrics.weeks"></span>
+          <span class="text-sm font-bold text-gray-700">semanas</span>
+          <span class="text-2xl font-black text-gray-800" x-text="'+' + metrics.days"></span>
+          <span class="text-xs font-bold text-gray-500">días</span>
+        </div>
+
+        <!-- Barra de progreso -->
+        <div class="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+          <div class="h-full bg-theme-primary transition-all duration-300" :style="'width: ' + metrics.progressPercent + '%'"></div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-3 flex items-center justify-between text-xs">
+          <div>
+            <p class="text-[10px] font-bold uppercase text-gray-400">Tamaño equivalente hoy</p>
+            <p class="font-extrabold text-gray-800" x-text="metrics.sizeComparison"></p>
+          </div>
+          <span class="text-[11px] font-bold text-theme-primary" x-text="metrics.sizeWeight"></span>
+        </div>
+
+        <!-- Selector rápido de género / tema -->
+        <div class="grid grid-cols-3 gap-1.5 pt-1">
+          <button @click="setGenderTheme('SURPRISE')" :class="state.settings.genderMode === 'SURPRISE' ? 'bg-theme-primary text-white' : 'bg-gray-100 text-gray-600'" class="py-1.5 rounded-xl text-[11px] font-bold transition">✨ Sorpresa</button>
+          <button @click="setGenderTheme('BOY')" :class="state.settings.genderMode === 'BOY' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'" class="py-1.5 rounded-xl text-[11px] font-bold transition">🩵 Niño</button>
+          <button @click="setGenderTheme('GIRL')" :class="state.settings.genderMode === 'GIRL' ? 'bg-pink-500 text-white' : 'bg-gray-100 text-gray-600'" class="py-1.5 rounded-xl text-[11px] font-bold transition">🩷 Niña</button>
+        </div>
+      </div>
+
+      <!-- Tarjeta Hito Emocional (Tarro de Propinas solo en Sem 12, 24 y 40) -->
+      <div x-show="activeMilestonePrompt" class="bg-amber-50 border-2 border-amber-300 rounded-3xl p-4 space-y-2">
+        <div class="flex justify-between items-start">
+          <p class="text-xs font-black text-amber-900" x-text="'🎉 ' + (activeMilestonePrompt?.title || '')"></p>
+          <button @click="dismissMilestone(activeMilestonePrompt.week)" class="text-xs text-amber-700 font-bold">&times;</button>
+        </div>
+        <p class="text-[11px] text-amber-800" x-text="activeMilestonePrompt?.text"></p>
+        <div class="flex gap-2">
+          <button @click="showTipModal = true" class="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-bold">☕ Apoyar Proyecto</button>
+          <button @click="showBookModal = true" class="px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-amber-900 text-xs font-bold">📖 Ver Libro de Oro</button>
+        </div>
+      </div>
+
+      <!-- Modo Consulta Médica en 1 toque -->
+      <button @click="showConsultationDrawer = true" class="w-full bg-theme-primary text-white rounded-2xl p-4 shadow-theme flex items-center justify-between">
+        <div class="flex items-center space-x-3 text-left">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl">🩺</div>
+          <div>
+            <h3 class="text-sm font-extrabold">Modo Consulta Médica</h3>
+            <p class="text-[11px] opacity-90">Vitales, curva de peso, dudas y estudios frente al doctor</p>
+          </div>
+        </div>
+        <span class="text-xs font-bold bg-white/20 px-2.5 py-1 rounded-full">Abrir →</span>
+      </button>
+
+      <!-- Híbrido Familiar: WhatsApp + Espejo /familia -->
+      <div class="bg-white rounded-2xl p-4 border border-theme shadow-sm space-y-2.5">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-xl">👨‍👩‍👧‍👦</div>
+          <div>
+            <h3 class="text-sm font-extrabold text-gray-900">Compartir con Familia y Amigos</h3>
+            <p class="text-[11px] text-gray-500">Envía actualización por WhatsApp o configura tu enlace web `/familia`</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <a :href="whatsappShareUrl" target="_blank" class="py-2 px-3 rounded-xl bg-emerald-600 text-white text-xs font-bold text-center">📲 Enviar por WhatsApp</a>
+          <button @click="showFamilyModal = true" class="py-2 px-3 rounded-xl bg-gray-100 text-gray-800 text-xs font-bold">⚙️ Configurar Link Web</button>
+        </div>
+      </div>
+
+      <!-- Sistema Dual de Exportación (Crudo Gratis vs Libro de Oro $49 MXN) -->
+      <div class="bg-white rounded-2xl p-4 border border-theme shadow-sm space-y-2.5">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-10 h-10 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-xl">📖</div>
+          <div>
+            <h3 class="text-sm font-extrabold text-gray-900">Exportar Datos y Recuerdos en PDF</h3>
+            <p class="text-[11px] text-gray-500">Reporte clínico gratuito o Libro Editorial listo para imprimir</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button @click="downloadRawClinicalReport()" class="py-2 px-2.5 rounded-xl bg-gray-100 text-gray-800 text-xs font-bold">📄 Clínico Crudo (Gratis)</button>
+          <button @click="showBookModal = true" class="py-2 px-2.5 rounded-xl bg-theme-primary text-white text-xs font-bold">✨ Libro de Oro ($49)</button>
+        </div>
+      </div>
+
+      <!-- Respaldo Completo Local (.json) -->
+      <div class="bg-white rounded-2xl p-4 border border-theme shadow-sm space-y-2">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-gray-900">💾 Respaldo Local en tu Teléfono</h3>
+            <p class="text-[11px] text-gray-500">Guarda o restaura todas tus citas, cartas y fotos</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button @click="exportFullJsonBackup()" class="py-2 px-3 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">⬇ Exportar Respaldo</button>
+          <label class="py-2 px-3 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 text-xs font-bold text-center cursor-pointer">
+            ⬆ Restaurar Respaldo
+            <input type="file" accept=".json,application/json" class="hidden" @change="importJsonBackup($event)">
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- TAB 2: MÉDICO (CITAS, CONSULTAS, LAB, ECOS, BIENESTAR)             -->
+    <!-- ================================================================== -->
+    <section x-show="activeTab === 'medico'" x-cloak class="space-y-3">
+
+      <!-- Alerta 24h en pantalla -->
+      <div x-show="imminentAppointments.length > 0" class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3 space-y-1.5">
+        <p class="text-xs font-black text-amber-900">⏰ Recordatorio de Cita (Hoy o Mañana)</p>
+        <template x-for="ia in imminentAppointments" :key="ia.id">
+          <div class="bg-white rounded-xl p-2 border border-amber-200 flex justify-between items-center text-xs">
+            <div>
+              <p class="font-bold text-gray-900" x-text="ia.doctorOrClinic"></p>
+              <p class="text-[11px] text-gray-500" x-text="ia.appointmentDate.replace('T', ' ')"></p>
+            </div>
+            <button @click="openGoogleCalendarFor(ia)" class="px-2 py-1 rounded-lg bg-amber-600 text-white text-[10px] font-bold">📅 Calendar</button>
+          </div>
+        </template>
+      </div>
+
+      <!-- 5 sub-pestañas -->
+      <div class="grid grid-cols-5 gap-1 bg-gray-100 p-1 rounded-2xl">
+        <button @click="medicalSubTab = 'citas'" :class="medicalSubTab === 'citas' ? 'bg-white text-theme-primary shadow-2xs' : 'text-gray-600'" class="py-2 px-1 rounded-xl text-[10px] font-bold truncate">📅 Citas</button>
+        <button @click="medicalSubTab = 'consultas'" :class="medicalSubTab === 'consultas' ? 'bg-white text-theme-primary shadow-2xs' : 'text-gray-600'" class="py-2 px-1 rounded-xl text-[10px] font-bold truncate">🩺 Visitas</button>
+        <button @click="medicalSubTab = 'laboratorio'" :class="medicalSubTab === 'laboratorio' ? 'bg-white text-theme-primary shadow-2xs' : 'text-gray-600'" class="py-2 px-1 rounded-xl text-[10px] font-bold truncate">🔬 Lab</button>
+        <button @click="medicalSubTab = 'ecos'" :class="medicalSubTab === 'ecos' ? 'bg-white text-theme-primary shadow-2xs' : 'text-gray-600'" class="py-2 px-1 rounded-xl text-[10px] font-bold truncate">👶 Ecos</button>
+        <button @click="medicalSubTab = 'bienestar'" :class="medicalSubTab === 'bienestar' ? 'bg-white text-theme-primary shadow-2xs' : 'text-gray-600'" class="py-2 px-1 rounded-xl text-[10px] font-bold truncate">⏱️ Bebé</button>
+      </div>
+
+      <!-- Sub-tab: Citas -->
+      <div x-show="medicalSubTab === 'citas'" class="space-y-3">
+        <!-- Curva de Signos Vitales -->
+        <div x-show="appointmentsWithVitals.length > 0" class="bg-white rounded-2xl p-3.5 border border-theme space-y-2">
+          <p class="text-xs font-extrabold text-gray-900">📈 Evolución de Peso, Presión y Latidos (FCF)</p>
+          <div class="flex items-end space-x-2 h-16 bg-blue-50/40 rounded-xl p-2 border border-blue-100 overflow-x-auto" x-show="appointmentsWithVitals.some(v => v.momWeightKg)">
+            <template x-for="vh in appointmentsWithVitals.filter(v => v.momWeightKg)" :key="'mc-' + vh.id">
+              <div class="flex flex-col items-center justify-end flex-1 min-w-[38px] h-full">
+                <span class="text-[9px] font-extrabold text-blue-800" x-text="vh.momWeightKg + 'kg'"></span>
+                <div class="w-5 rounded-t bg-blue-500" :style="'height:' + Math.max(20, Math.min(100, Math.round(((vh.momWeightKg - 40)/60)*100))) + '%'"></div>
+                <span class="text-[9px] text-gray-500" x-text="'S' + vh.gestationalWeek"></span>
+              </div>
+            </template>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-[11px] text-left">
+              <thead><tr class="text-[10px] text-gray-400 border-b"><th>Sem</th><th>Peso</th><th>Presión</th><th>FCF</th></tr></thead>
+              <tbody class="divide-y">
+                <template x-for="vh in appointmentsWithVitals" :key="'mr-' + vh.id">
+                  <tr>
+                    <td class="py-1 font-bold text-theme-primary" x-text="'S' + vh.gestationalWeek + '.' + vh.gestationalDay"></td>
+                    <td class="py-1" x-text="vh.momWeightKg ? vh.momWeightKg + ' kg' : '—'"></td>
+                    <td class="py-1" x-text="vh.bloodPressure || '—'"></td>
+                    <td class="py-1 text-emerald-700 font-bold" x-text="vh.babyHeartRateBpm ? vh.babyHeartRateBpm + ' lpm' : '—'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex space-x-1 overflow-x-auto">
+            <button @click="apptFilter = 'ALL'" :class="apptFilter === 'ALL' ? 'bg-theme-primary text-white' : 'bg-white text-gray-600 border border-theme'" class="px-2.5 py-1 rounded-full text-[11px] font-bold">Todas</button>
+            <button @click="apptFilter = 'MEDICO'" :class="apptFilter === 'MEDICO' ? 'bg-theme-primary text-white' : 'bg-white text-gray-600 border border-theme'" class="px-2.5 py-1 rounded-full text-[11px] font-bold">🩺 Médico</button>
+            <button @click="apptFilter = 'LABORATORIO'" :class="apptFilter === 'LABORATORIO' ? 'bg-theme-primary text-white' : 'bg-white text-gray-600 border border-theme'" class="px-2.5 py-1 rounded-full text-[11px] font-bold">🔬 Lab</button>
+            <button @click="apptFilter = 'ECO'" :class="apptFilter === 'ECO' ? 'bg-theme-primary text-white' : 'bg-white text-gray-600 border border-theme'" class="px-2.5 py-1 rounded-full text-[11px] font-bold">👶 Eco</button>
+          </div>
+          <button @click="openApptModal('MEDICO')" class="px-3 py-1.5 rounded-xl bg-theme-primary text-white text-xs font-bold flex-shrink-0">+ Cita</button>
+        </div>
+
+        <template x-for="a in filteredAppointments" :key="a.id">
+          <div class="bg-white rounded-2xl p-3.5 border border-theme space-y-2">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="flex flex-wrap gap-1 mb-1">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200" x-text="a.appointmentType"></span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-theme-primary-light text-theme-primary" x-text="'Sem ' + a.gestationalWeek + '.' + a.gestationalDay"></span>
+                </div>
+                <h4 class="text-sm font-extrabold text-gray-900" x-text="a.doctorOrClinic"></h4>
+                <p class="text-[11px] text-gray-500" x-text="a.appointmentDate.replace('T', ' ')"></p>
+              </div>
+              <div class="flex space-x-1">
+                <button @click="openApptModal(a.appointmentType, a)" class="text-xs p-1">✏️</button>
+                <button @click="deleteAppointment(a.id)" class="text-xs p-1 text-red-400">🗑️</button>
+              </div>
+            </div>
+            <div class="flex gap-1.5 pt-1 border-t border-gray-100">
+              <button @click="openGoogleCalendarFor(a)" class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-[11px] font-bold">📅 + Google Calendar</button>
+              <button @click="downloadIcsFor(a)" class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 text-[11px] font-bold">🔔 Alerta .ics</button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Sub-tab: Consultas Médicas (Diagnósticos y Recetas) -->
+      <div x-show="medicalSubTab === 'consultas'" class="space-y-3">
+        <div class="flex justify-between items-center">
+          <p class="text-xs font-bold text-gray-700">Diagnósticos y Recetas</p>
+          <button @click="openStudyModal('DIAGNOSTICO')" class="px-3 py-1.5 rounded-xl bg-theme-primary text-white text-xs font-bold">+ Diagnóstico / Receta</button>
+        </div>
+        <template x-for="st in medicalVisitResults" :key="st.id">
+          <div class="bg-white rounded-2xl p-3.5 border border-theme space-y-2">
+            <div class="flex justify-between items-start">
+              <div>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200" x-text="st.studyType"></span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-theme-primary-light text-theme-primary" x-text="'Sem ' + st.gestationalWeek"></span>
+                <h4 class="text-sm font-extrabold text-gray-900 mt-1" x-text="st.title"></h4>
+                <p class="text-[11px] text-gray-400" x-text="st.studyDate"></p>
+              </div>
+              <button @click="deleteStudy(st.id)" class="text-xs text-red-400 p-1">🗑️</button>
+            </div>
+            <p x-show="st.summaryNotes" class="text-xs text-gray-700 bg-amber-50/40 rounded-xl p-2.5 whitespace-pre-line" x-text="st.summaryNotes"></p>
+            <div class="flex flex-wrap gap-2" x-show="st.attachments && st.attachments.length > 0">
+              <template x-for="att in st.attachments" :key="att.id">
+                <button @click="viewerItem = att" class="px-2.5 py-1 rounded-lg bg-gray-100 text-xs font-bold text-gray-800" x-text="(att.fileCategory === 'PDF' ? '📄 ' : '🖼️ ') + att.originalFilename"></button>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Sub-tab: Laboratorio -->
+      <div x-show="medicalSubTab === 'laboratorio'" class="space-y-3">
+        <div class="flex justify-between items-center">
+          <p class="text-xs font-bold text-gray-700">Estudios de Laboratorio</p>
+          <button @click="openStudyModal('LABORATORIO')" class="px-3 py-1.5 rounded-xl bg-theme-primary text-white text-xs font-bold">+ Resultado / Cita Lab</button>
+        </div>
+        <template x-for="st in labResults" :key="st.id">
+          <div class="bg-white rounded-2xl p-3.5 border border-theme space-y-2">
+            <div class="flex justify-between items-start">
+              <div>
+                <h4 class="text-sm font-extrabold text-gray-900" x-text="st.title"></h4>
+                <p class="text-[11px] text-gray-400" x-text="st.studyDate + ' · Sem ' + st.gestationalWeek"></p>
+              </div>
+              <button @click="deleteStudy(st.id)" class="text-xs text-red-400 p-1">🗑️</button>
+            </div>
+            <p x-show="st.summaryNotes" class="text-xs text-gray-700 bg-blue-50/50 rounded-xl p-2.5 whitespace-pre-line" x-text="st.summaryNotes"></p>
+            <div class="flex flex-wrap gap-2" x-show="st.attachments && st.attachments.length > 0">
+              <template x-for="att in st.attachments" :key="att.id">
+                <button @click="viewerItem = att" class="px-2.5 py-1 rounded-lg bg-gray-100 text-xs font-bold text-gray-800" x-text="(att.fileCategory === 'PDF' ? '📄 ' : '🖼️ ') + att.originalFilename"></button>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Sub-tab: Ecos -->
+      <div x-show="medicalSubTab === 'ecos'" class="space-y-3">
+        <div class="flex justify-between items-center">
+          <p class="text-xs font-bold text-gray-700">Galería de Ultrasonidos</p>
+          <button @click="openStudyModal('ULTRASONIDO')" class="px-3 py-1.5 rounded-xl bg-theme-primary text-white text-xs font-bold">+ Nuevo Eco</button>
+        </div>
+        <template x-for="eco in ultrasounds" :key="eco.id">
+          <div class="bg-white rounded-2xl p-3.5 border border-theme space-y-2">
+            <div class="flex justify-between items-start">
+              <div>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800" x-text="'Sem ' + eco.gestationalWeek + '.' + eco.gestationalDay"></span>
+                <h4 class="text-sm font-extrabold text-gray-900 mt-1" x-text="eco.title"></h4>
+                <p class="text-[11px] text-gray-400" x-text="eco.studyDate"></p>
+              </div>
+              <button @click="deleteStudy(eco.id)" class="text-xs text-red-400 p-1">🗑️</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2" x-show="eco.attachments && eco.attachments.some(a => a.fileCategory === 'IMAGE')">
+              <template x-for="att in eco.attachments.filter(a => a.fileCategory === 'IMAGE')" :key="att.id">
+                <img :src="att.dataUrl" @click="viewerItem = att" class="w-full aspect-square object-cover rounded-xl border cursor-pointer">
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Sub-tab: Bienestar (Pataditas + Contracciones) -->
+      <div x-show="medicalSubTab === 'bienestar'" class="space-y-3">
+        <!-- Contador de Pataditas -->
+        <div class="bg-white rounded-3xl p-4 border border-theme space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-sm font-extrabold text-gray-900">🦶 Contador de Pataditas</h3>
+              <p class="text-[11px] text-gray-500">Meta: 10 movimientos fetales</p>
+            </div>
+            <div class="text-right">
+              <p class="text-2xl font-black text-theme-primary" x-text="kickCounter.count + ' / 10'"></p>
+              <p class="text-[10px] text-gray-400 font-bold" x-text="formatSeconds(kickCounter.elapsedSeconds)"></p>
+            </div>
+          </div>
+          <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full bg-emerald-500 transition-all" :style="'width:' + Math.min(100, kickCounter.count * 10) + '%'"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button @click="registerKickTap()" class="py-3 rounded-2xl bg-theme-primary text-white text-xs font-extrabold">🦶 +1 Patadita</button>
+            <button @click="saveKickSession()" :disabled="kickCounter.count === 0" class="py-3 rounded-2xl bg-emerald-600 text-white text-xs font-extrabold disabled:opacity-40">💾 Guardar</button>
+          </div>
+        </div>
+
+        <!-- Cronómetro de Contracciones -->
+        <div class="bg-white rounded-3xl p-4 border border-theme space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-sm font-extrabold text-gray-900">⏱️ Cronómetro de Contracciones</h3>
+              <p class="text-[11px] text-gray-500">Mide duración e intervalo (sin anuncios)</p>
+            </div>
+            <p class="text-2xl font-black" :class="contractionTimer.active ? 'text-rose-600' : 'text-gray-800'" x-text="formatSeconds(contractionTimer.elapsedSeconds)"></p>
+          </div>
+          <button @click="toggleContractionTimer()" :class="contractionTimer.active ? 'bg-rose-600' : 'bg-amber-500'" class="w-full py-3 rounded-2xl text-white text-xs font-extrabold" x-text="contractionTimer.active ? '⏹️ Terminó Contracción (Guardar)' : '▶️ Iniciar Contracción'"></button>
+        </div>
+
+        <!-- Historial -->
+        <div class="bg-white rounded-2xl p-3.5 border border-theme space-y-2">
+          <h4 class="text-xs font-extrabold text-gray-700">Historial Reciente</h4>
+          <template x-for="fl in state.fetalLogs" :key="fl.id">
+            <div class="flex justify-between items-center p-2 rounded-xl bg-gray-50 text-xs">
+              <div>
+                <span class="font-bold" x-text="fl.logType === 'PATADITAS' ? '🦶 ' + fl.kickCount + ' pataditas' : '⏱️ ' + fl.durationSeconds + ' seg'"></span>
+                <span class="text-[10px] text-gray-500" x-text="fl.intervalMinutes ? (' · cada ' + fl.intervalMinutes + ' min') : ''"></span>
+                <p class="text-[10px] text-gray-400" x-text="'Sem ' + fl.gestationalWeek + '.' + fl.gestationalDay"></p>
+              </div>
+              <button @click="deleteFetalLog(fl.id)" class="text-red-400 text-xs">🗑️</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- TAB 3: CHECKLIST & AFILIADOS AMAZON MX                             -->
+    <!-- ================================================================== -->
+    <section x-show="activeTab === 'checklist'" x-cloak class="space-y-3">
+      <div class="bg-white rounded-2xl p-4 border border-theme space-y-2">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-base font-extrabold text-gray-900">Checklist & Presupuesto</h2>
+            <p class="text-[11px] text-gray-500" x-text="checklistStats.done + ' de ' + checklistStats.total + ' listos (' + checklistStats.pct + '%)'"></p>
+          </div>
+          <button @click="showChecklistModal = true" class="px-3 py-1.5 rounded-xl bg-theme-primary text-white text-xs font-bold">+ Artículo</button>
+        </div>
+        <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div class="h-full bg-emerald-500" :style="'width:' + checklistStats.pct + '%'"></div>
+        </div>
+        <p class="text-[11px] text-gray-600">Gastado: <strong class="text-emerald-700" x-text="'$' + checklistStats.act + ' MXN'"></strong> · Estimado total: <strong x-text="'$' + checklistStats.est + ' MXN'"></strong></p>
+      </div>
+
+      <div class="flex space-x-1.5 overflow-x-auto pb-1">
+        <template x-for="cat in ['ALL','HABITACION','TRANSPORTE','ALIMENTACION','HIGIENE','ROPA','HOSPITAL']" :key="cat">
+          <button @click="checklistCategory = cat" :class="checklistCategory === cat ? 'bg-theme-primary text-white' : 'bg-white text-gray-600 border border-theme'" class="px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap" x-text="cat === 'ALL' ? 'Todos' : cat"></button>
+        </template>
+      </div>
+
+      <div class="space-y-2">
+        <template x-for="item in filteredChecklist" :key="item.id">
+          <div class="bg-white rounded-2xl p-3 border border-theme flex items-start justify-between gap-2">
+            <div class="flex items-start space-x-2.5">
+              <input type="checkbox" :checked="item.isCompleted" @change="toggleChecklistItem(item)" class="mt-1 w-4 h-4 rounded">
+              <div>
+                <p class="text-xs font-bold text-gray-900" :class="item.isCompleted ? 'line-through text-gray-400' : ''" x-text="item.itemName"></p>
+                <p class="text-[10px] text-gray-500" x-text="item.description + ' · Est. $' + item.estimatedCostMxn + ' MXN'"></p>
+                <a :href="amazonLink(item)" target="_blank" class="inline-block mt-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-900 text-[10px] font-bold">🛒 Ver opciones en Amazon MX</a>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- TAB 4: DIARIO & ÁLBUM DE MOMENTOS                                  -->
+    <!-- ================================================================== -->
+    <section x-show="activeTab === 'diario'" x-cloak class="space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-base font-extrabold text-gray-900">Diario de Cartas y Momentos</h2>
+        <div class="flex gap-1.5">
+          <button @click="showMomentModal = true" class="px-2.5 py-1.5 rounded-xl bg-purple-600 text-white text-xs font-bold">+ Foto</button>
+          <button @click="showJournalModal = true" class="px-3 py-1.5 rounded-xl bg-theme-primary text-white text-xs font-bold">+ Carta</button>
+        </div>
+      </div>
+
+      <!-- Álbum de Fotos -->
+      <div x-show="state.moments.length > 0" class="grid grid-cols-2 gap-2">
+        <template x-for="m in state.moments" :key="m.id">
+          <div class="bg-white rounded-2xl overflow-hidden border border-theme shadow-2xs">
+            <img :src="m.imageDataUrl" @click="viewerItem = { fileCategory: 'IMAGE', dataUrl: m.imageDataUrl, originalFilename: m.title }" class="w-full aspect-square object-cover cursor-pointer">
+            <div class="p-2">
+              <p class="text-[10px] font-bold text-theme-primary" x-text="'Sem ' + m.gestationalWeek"></p>
+              <p class="text-xs font-bold text-gray-900 truncate" x-text="m.title"></p>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Cartas -->
+      <div class="space-y-2.5">
+        <template x-for="n in filteredJournal" :key="n.id">
+          <div class="bg-white rounded-2xl p-3.5 border border-theme space-y-1.5">
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="px-2 py-0.5 rounded-full font-bold bg-theme-primary-light text-theme-primary" x-text="n.authorDisplayName"></span>
+              <span class="text-gray-400 font-bold" x-text="'Sem ' + n.gestationalWeek + '.' + n.gestationalDay"></span>
+            </div>
+            <h4 class="text-sm font-extrabold text-gray-900" x-text="n.title"></h4>
+            <p class="text-xs text-gray-700 whitespace-pre-line" x-text="n.content"></p>
+            <img x-show="n.attachedImageDataUrl" :src="n.attachedImageDataUrl" class="w-full max-h-48 object-cover rounded-xl mt-2">
+          </div>
+        </template>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- BANNER INFERIOR ÉTICO (AdMob Placeholder — Se oculta en Modo Consulta y Contracciones) -->
+  <div x-show="!hideAdsForEthics" x-cloak class="fixed bottom-16 left-0 right-0 z-20 max-w-lg mx-auto px-3">
+    <div class="bg-white/95 border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm flex items-center justify-between text-[10px]">
+      <div class="flex items-center space-x-2">
+        <span class="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-bold">Anuncio</span>
+        <span class="text-gray-600 font-medium">Espacio banner discreto (AdMob)</span>
+      </div>
+      <button @click="showBookModal = true" class="text-theme-primary font-bold underline">Quitar con Libro $49</button>
+    </div>
+  </div>
+
+  <!-- BARRA DE NAVEGACIÓN INFERIOR -->
+  <nav class="fixed bottom-0 left-0 right-0 z-30 bg-theme-surface/95 backdrop-blur-md border-t border-theme pb-safe">
+    <div class="max-w-lg mx-auto grid grid-cols-4 gap-1 px-2 py-1.5">
+      <button @click="activeTab = 'inicio'" :class="activeTab === 'inicio' ? 'text-theme-primary font-extrabold' : 'text-theme-muted'" class="flex flex-col items-center py-1 text-[11px]"><span class="text-lg">🏠</span><span>Inicio</span></button>
+      <button @click="activeTab = 'medico'" :class="activeTab === 'medico' ? 'text-theme-primary font-extrabold' : 'text-theme-muted'" class="flex flex-col items-center py-1 text-[11px]"><span class="text-lg">🩺</span><span>Médico</span></button>
+      <button @click="activeTab = 'checklist'" :class="activeTab === 'checklist' ? 'text-theme-primary font-extrabold' : 'text-theme-muted'" class="flex flex-col items-center py-1 text-[11px]"><span class="text-lg">🛒</span><span>Checklist</span></button>
+      <button @click="activeTab = 'diario'" :class="activeTab === 'diario' ? 'text-theme-primary font-extrabold' : 'text-theme-muted'" class="flex flex-col items-center py-1 text-[11px]"><span class="text-lg">💌</span><span>Diario</span></button>
+    </div>
+  </nav>
+
+  <!-- ==================================================================== -->
+  <!-- MODALES & DRAWERS                                                    -->
+  <!-- ==================================================================== -->
+
+  <!-- Drawer Modo Consulta Médica (100% libre de anuncios) -->
+  <div x-show="showConsultationDrawer" x-cloak class="fixed inset-0 z-50 bg-black/55 flex items-end sm:items-center justify-center">
+    <div @click.outside="showConsultationDrawer = false" class="bg-theme-surface w-full max-w-lg max-h-[90vh] rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden">
+      <div class="bg-theme-primary text-white px-5 py-4 flex justify-between items-center">
+        <div>
+          <h3 class="text-base font-extrabold">🩺 Modo Consulta Médica</h3>
+          <p class="text-xs opacity-90" x-text="metrics.weeks + ' sem + ' + metrics.days + ' días · ' + metrics.trimesterName"></p>
+        </div>
+        <button @click="showConsultationDrawer = false" class="text-2xl font-bold">&times;</button>
+      </div>
+      <div class="p-4 overflow-y-auto space-y-3 text-xs">
+        <div class="bg-white rounded-2xl p-3 border border-theme grid grid-cols-3 gap-2 text-center">
+          <div><p class="text-[10px] text-gray-500">FPP</p><p class="font-bold" x-text="state.settings.dueDate"></p></div>
+          <div><p class="text-[10px] text-gray-500">Sangre</p><p class="font-bold" x-text="state.settings.momBloodType || 'Sin definir'"></p></div>
+          <div><p class="text-[10px] text-gray-500">Alergias</p><p class="font-bold" x-text="state.settings.allergiesNotes || 'Ninguna'"></p></div>
+        </div>
+        <div class="bg-white rounded-2xl p-3 border border-theme" x-show="latestVitals">
+          <p class="font-bold text-gray-500 uppercase text-[10px] mb-1">Últimos Signos Vitales</p>
+          <p class="font-extrabold text-sm" x-text="'Peso: ' + (latestVitals?.momWeightKg || '—') + ' kg · Presión: ' + (latestVitals?.bloodPressure || '—') + ' · FCF: ' + (latestVitals?.babyHeartRateBpm || '—') + ' lpm'"></p>
+        </div>
+        <div class="bg-white rounded-2xl p-3 border border-theme">
+          <p class="font-bold text-gray-500 uppercase text-[10px] mb-1">Dudas Anotadas para el Doctor</p>
+          <template x-for="pq in pendingQuestions" :key="pq.id">
+            <p class="bg-amber-50 p-2 rounded-xl mb-1 text-gray-800" x-text="pq.questionsForDoctor"></p>
+          </template>
+          <p x-show="pendingQuestions.length === 0" class="text-gray-400">Sin dudas pendientes.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Libro de Oro ($49 MXN) -->
+  <div x-show="showBookModal" x-cloak class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+    <div @click.outside="showBookModal = false" class="bg-white rounded-3xl max-w-md w-full p-5 space-y-3">
+      <h3 class="text-base font-black text-gray-900">✨ El Libro de Oro del Embarazo</h3>
+      <p class="text-xs text-gray-600">Genera un PDF ilustrado por capítulos y semanas con tus ecos, fotos, cartas de Mamá y Papá y hoja final de huellitas, listo para imprimir y empastar.</p>
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs space-y-1">
+        <p class="font-extrabold text-amber-900">Incluye de regalo:</p>
+        <p class="text-amber-800">✓ Desbloqueo permanente por un único pago de <strong>$49 MXN</strong>.</p>
+        <p class="text-amber-800">✓ Eliminación para siempre del banner inferior de anuncios.</p>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button @click="openMemoryBook(true)" class="py-2.5 rounded-xl bg-gray-100 text-gray-800 text-xs font-bold">👀 Vista Previa Gratis</button>
+        <button @click="unlockMemoryBookDemo()" class="py-2.5 rounded-xl bg-theme-primary text-white text-xs font-extrabold">💳 Desbloquear ($49)</button>
+      </div>
+      <button @click="showBookModal = false" class="w-full py-1.5 text-xs text-gray-400 font-bold">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- Modal Tarro de Propinas -->
+  <div x-show="showTipModal" x-cloak class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+    <div @click.outside="showTipModal = false" class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-3 text-center">
+      <div class="text-3xl">☕</div>
+      <h3 class="text-base font-black text-gray-900">Apoya a BabyTrack</h3>
+      <p class="text-xs text-gray-500">Tu aportación voluntaria quita los anuncios para siempre y ayuda a mantener la app accesible.</p>
+      <div class="grid grid-cols-3 gap-2">
+        <button @click="supportWithTip(29)" class="py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-extrabold">☕ $29</button>
+        <button @click="supportWithTip(69)" class="py-2.5 rounded-xl bg-amber-100 border border-amber-300 text-amber-950 text-xs font-extrabold">🍼 $69</button>
+        <button @click="supportWithTip(149)" class="py-2.5 rounded-xl bg-theme-primary text-white text-xs font-extrabold">🌟 $149</button>
+      </div>
+      <button @click="showTipModal = false" class="text-xs text-gray-400 font-bold">Ahora no</button>
+    </div>
+  </div>
+
+  <!-- Modal Calibración / Ajustes / PIN -->
+  <div x-show="showCalibrateModal" x-cloak class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div @click.outside="showCalibrateModal = false" class="bg-white rounded-3xl max-w-md w-full p-5 space-y-3 max-h-[90vh] overflow-y-auto">
+      <h3 class="text-sm font-black text-gray-900">⚙️ Ajustes, Calibración y Privacidad</h3>
+      <div class="space-y-2 text-xs">
+        <label class="block font-bold">Apodo del Bebé</label>
+        <input type="text" x-model="calibrateForm.babyNickname" class="w-full px-3 py-2 border rounded-xl">
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="block font-bold">Mamá</label><input type="text" x-model="calibrateForm.momName" class="w-full px-3 py-2 border rounded-xl"></div>
+          <div><label class="block font-bold">Papá</label><input type="text" x-model="calibrateForm.dadName" class="w-full px-3 py-2 border rounded-xl"></div>
+        </div>
+        <label class="block font-bold">Fecha Probable de Parto (FPP)</label>
+        <input type="date" x-model="calibrateForm.dueDate" class="w-full px-3 py-2 border rounded-xl">
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="block font-bold">Semanas exactas</label><input type="number" x-model="calibrateForm.currentWeeks" class="w-full px-3 py-2 border rounded-xl"></div>
+          <div><label class="block font-bold">Días</label><input type="number" x-model="calibrateForm.currentDays" class="w-full px-3 py-2 border rounded-xl"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="block font-bold">Tipo de Sangre</label><input type="text" x-model="calibrateForm.momBloodType" placeholder="Ej. O+" class="w-full px-3 py-2 border rounded-xl"></div>
+          <div><label class="block font-bold">Alergias</label><input type="text" x-model="calibrateForm.allergiesNotes" class="w-full px-3 py-2 border rounded-xl"></div>
+        </div>
+        <div class="bg-gray-50 p-2.5 rounded-xl space-y-1.5">
+          <label class="flex items-center space-x-2 font-bold"><input type="checkbox" x-model="calibrateForm.pinEnabled"><span>🔐 Bloquear app con PIN al abrir</span></label>
+          <input x-show="calibrateForm.pinEnabled" type="text" inputmode="numeric" x-model="calibrateForm.pinCode" placeholder="PIN (ej. 1419)" class="w-full px-3 py-1.5 border rounded-lg">
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button @click="saveCalibration(false)" class="w-1/2 py-2 bg-gray-200 rounded-xl font-bold">Guardar FPP</button>
+          <button @click="saveCalibration(true)" class="w-1/2 py-2 bg-theme-primary text-white rounded-xl font-bold">Calibrar Semanas</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Link Familiar Híbrido -->
+  <div x-show="showFamilyModal" x-cloak class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div @click.outside="showFamilyModal = false" class="bg-white rounded-3xl max-w-md w-full p-5 space-y-3 text-xs">
+      <h3 class="text-sm font-black">👨‍👩‍👧‍👦 Link Familiar Híbrido (Cloud Run + WhatsApp)</h3>
+      <p class="text-gray-600">Si tienes tu página pública `/familia` desplegada en la nube, pégala aquí para incluirla automáticamente al enviar tarjetas por WhatsApp:</p>
+      <input type="url" x-model="state.settings.familyCloudEndpoint" placeholder="https://tu-app.run.app/familia" class="w-full px-3 py-2 border rounded-xl">
+      <button @click="persist(); showFamilyModal = false; notify('Enlace familiar guardado.')" class="w-full py-2.5 bg-theme-primary text-white rounded-xl font-bold">Guardar Enlace</button>
+    </div>
+  </div>
+
+  <!-- Modal Agendar Cita -->
+  <div x-show="showApptModal" x-cloak class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div @click.outside="showApptModal = false" class="bg-white rounded-3xl max-w-md w-full p-5 space-y-3 max-h-[90vh] overflow-y-auto text-xs">
+      <h3 class="text-sm font-black" x-text="apptForm.id ? 'Editar Cita' : 'Agendar Cita'"></h3>
+      <form @submit.prevent="saveAppointment()" class="space-y-2.5">
+        <div class="grid grid-cols-3 gap-1.5">
+          <button type="button" @click="apptForm.appointmentType = 'MEDICO'" :class="apptForm.appointmentType === 'MEDICO' ? 'bg-emerald-600 text-white' : 'bg-gray-100'" class="py-2 rounded-xl font-bold">🩺 Médico</button>
+          <button type="button" @click="apptForm.appointmentType = 'LABORATORIO'" :class="apptForm.appointmentType === 'LABORATORIO' ? 'bg-blue-600 text-white' : 'bg-gray-100'" class="py-2 rounded-xl font-bold">🔬 Lab</button>
+          <button type="button" @click="apptForm.appointmentType = 'ECO'" :class="apptForm.appointmentType === 'ECO' ? 'bg-purple-600 text-white' : 'bg-gray-100'" class="py-2 rounded-xl font-bold">👶 Eco</button>
+        </div>
+        <input type="datetime-local" x-model="apptForm.appointmentDate" required class="w-full px-3 py-2 border rounded-xl">
+        <input type="text" x-model="apptForm.doctorOrClinic" required placeholder="Médico, Laboratorio o Clínica" class="w-full px-3 py-2 border rounded-xl">
+        <div class="grid grid-cols-3 gap-2" x-show="apptForm.appointmentType !== 'LABORATORIO'">
+          <input type="number" step="0.1" x-model="apptForm.momWeightKg" placeholder="Peso (kg)" class="px-2.5 py-2 border rounded-xl">
+          <input type="text" x-model="apptForm.bloodPressure" placeholder="Presión" class="px-2.5 py-2 border rounded-xl">
+          <input type="number" x-model="apptForm.babyHeartRateBpm" placeholder="FCF lpm" class="px-2.5 py-2 border rounded-xl">
+        </div>
+        <textarea x-model="apptForm.questionsForDoctor" rows="2" placeholder="Dudas o indicaciones (ej. ayuno 8 hrs)..." class="w-full px-3 py-2 border rounded-xl"></textarea>
+        <div class="flex gap-2">
+          <button type="button" @click="showApptModal = false" class="w-1/2 py-2 border rounded-xl font-bold">Cancelar</button>
+          <button type="submit" class="w-1/2 py-2 bg-theme-primary text-white rounded-xl font-bold">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Nuevo Estudio / Diagnóstico / Receta / Eco -->
+  <div x-show="showStudyModal" x-cloak class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div @click.outside="showStudyModal = false" class="bg-white rounded-3xl max-w-md w-full p-5 space-y-3 max-h-[90vh] overflow-y-auto text-xs">
+      <h3 class="text-sm font-black">Guardar Registro Médico</h3>
+      <form @submit.prevent="saveStudy()" class="space-y-2.5">
+        <select x-model="studyForm.studyType" class="w-full px-3 py-2 border rounded-xl bg-white font-bold">
+          <option value="DIAGNOSTICO">🩺 Diagnóstico / Visita Médica</option>
+          <option value="RECETA">💊 Receta / Medicamentos</option>
+          <option value="LABORATORIO">🔬 Resultado de Laboratorio</option>
+          <option value="ULTRASONIDO">👶 Ultrasonido (Eco)</option>
+        </select>
+        <input type="date" x-model="studyForm.studyDate" required class="w-full px-3 py-2 border rounded-xl">
+        <label x-show="studyForm.studyType === 'LABORATORIO'" class="flex items-center space-x-2 bg-blue-50 p-2 rounded-xl font-bold text-blue-900">
+          <input type="checkbox" x-model="studyForm.saveAsAppointment"><span>📅 Fecha futura: guardar como cita sin documento</span>
+        </label>
+        <input type="text" x-model="studyForm.title" required placeholder="Título descriptivo" class="w-full px-3 py-2 border rounded-xl">
+        <textarea x-model="studyForm.summaryNotes" rows="3" placeholder="Notas, resultados o medicamentos..." class="w-full px-3 py-2 border rounded-xl"></textarea>
+        <div x-show="!studyForm.saveAsAppointment" class="bg-gray-50 p-2.5 rounded-xl border border-dashed">
+          <label class="block font-bold mb-1">📎 Adjuntar Fotos o PDFs (Opcional, se comprimen automático)</label>
+          <input type="file" accept="image/*,application/pdf" multiple @change="handleStudyFilesSelect($event)" class="w-full">
+        </div>
+        <div class="flex gap-2">
+          <button type="button" @click="showStudyModal = false" class="w-1/2 py-2 border rounded-xl font-bold">Cancelar</button>
+          <button type="submit" class="w-1/2 py-2 bg-theme-primary text-white rounded-xl font-bold">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Nuevo Artículo Checklist -->
+  <div x-show="showChecklistModal" x-cloak class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div @click.outside="showChecklistModal = false" class="bg-white rounded-3xl max-w-sm w-full p-5 space-y-3 text-xs">
+      <h3 class="text-sm font-black">Agregar Artículo al Checklist</h3>
+      <form @submit.prevent="addChecklistItem()" class="space-y-2">
+        <select x-model="checkForm.category" class="w-full px-3 py-2 border rounded-xl bg-white">
+          <option value="HABITACION">HABITACION</option><option value="TRANSPORTE">TRANSPORTE</option>
+          <option value="ALIMENTACION">ALIMENTACION</option><option value="HIGIENE">HIGIENE</option>
+          <option value="ROPA">ROPA</option><option value="HOSPITAL">HOSPITAL</option>
+        </select>
+        <input type="text" x-model="checkForm.itemName" required placeholder="Nombre del artículo" class="w-full px-3 py-2 border rounded-xl">
+        <input type="number" x-model="checkForm.estimatedCostMxn" placeholder="Costo estimado MXN" class="w-full px-3 py-2 border rounded-xl">
+        <button type="submit" class="w-full py-2.5 bg-theme-primary text-white rounded-xl font-bold">Agregar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Nueva Carta Diario -->
+  <div x-show="showJournalModal" x-cloak class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div @click.outside="showJournalModal = false" class="bg-white rounded-3xl max-w-md w-full p-5 space-y-3 text-xs">
+      <h3 class="text-sm font-black">💌 Escribir Carta para el Bebé</h3>
+      <form @submit.prevent="saveJournalNote()" class="space-y-2.5">
+        <select x-model="journalForm.authorRole" class="w-full px-3 py-2 border rounded-xl bg-white font-bold">
+          <option value="MAMA">👩 Mamá</option><option value="PAPA">👨 Papá</option>
+        </select>
+        <input type="text" x-model="journalForm.title" required placeholder="Título de la carta" class="w-full px-3 py-2 border rounded-xl">
+        <textarea x-model="journalForm.content" required rows="4" placeholder="Escribe lo que sientes hoy..." class="w-full px-3 py-2 border rounded-xl"></textarea>
+        <input type="file" accept="image/*" @change="handleJournalPhoto($event)" class="w-full">
+        <button type="submit" class="w-full py-2.5 bg-theme-primary text-white rounded-xl font-bold">Guardar Carta</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Nuevo Momento (Foto) -->
+  <div x-show="showMomentModal" x-cloak class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div @click.outside="showMomentModal = false" class="bg-white rounded-3xl max-w-md w-full p-5 space-y-3 text-xs">
+      <h3 class="text-sm font-black">📸 Agregar Foto al Álbum</h3>
+      <form @submit.prevent="saveMoment()" class="space-y-2.5">
+        <input type="text" x-model="momentForm.title" required placeholder="Título del momento" class="w-full px-3 py-2 border rounded-xl">
+        <input type="date" x-model="momentForm.momentDate" required class="w-full px-3 py-2 border rounded-xl">
+        <input type="file" accept="image/*" required @change="handleMomentPhoto($event)" class="w-full">
+        <button type="submit" class="w-full py-2.5 bg-purple-600 text-white rounded-xl font-bold">Guardar Foto</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Visor de Archivos Locales -->
+  <div x-show="viewerItem" x-cloak class="fixed inset-0 z-50 bg-black/90 flex flex-col p-4">
+    <div class="flex justify-between items-center text-white mb-2">
+      <span class="text-xs font-bold truncate" x-text="viewerItem?.originalFilename"></span>
+      <button @click="viewerItem = null" class="text-2xl font-bold px-2">&times;</button>
+    </div>
+    <div class="flex-1 flex items-center justify-center overflow-auto">
+      <template x-if="viewerItem?.fileCategory === 'IMAGE'">
+        <img :src="viewerItem.dataUrl" class="max-w-full max-h-full rounded-xl">
+      </template>
+      <template x-if="viewerItem?.fileCategory === 'PDF'">
+        <div class="bg-white rounded-2xl p-6 text-center space-y-3 max-w-xs">
+          <div class="text-4xl">📄</div>
+          <p class="text-xs font-bold text-gray-800" x-text="viewerItem.originalFilename"></p>
+          <a :href="viewerItem.dataUrl" :download="viewerItem.originalFilename" class="inline-block px-4 py-2 rounded-xl bg-theme-primary text-white text-xs font-bold">Descargar / Abrir PDF</a>
+        </div>
+      </template>
+    </div>
+  </div>
+
+</body>
+</html>
