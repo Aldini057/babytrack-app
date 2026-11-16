@@ -135,3 +135,24 @@ test('BabyExport builds both Free Raw Clinical HTML and Editorial Memory Book HT
   assert.match(bookHtml, /Lucía/);
   assert.match(bookHtml, /Abuelita Carmen/);
 });
+
+test('Version consistency across package.json, build.gradle, and www/js/version.js', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf-8'));
+  const gradle = fs.readFileSync(path.join(rootDir, 'android/app/build.gradle'), 'utf-8');
+  const webVerCode = fs.readFileSync(path.join(wwwJsDir, 'version.js'), 'utf-8');
+
+  const sandbox = { window: {} };
+  sandbox.window = sandbox;
+  vm.runInNewContext(webVerCode, sandbox, { filename: 'version.js' });
+
+  const gradleCodeMatch = gradle.match(/versionCode\s+(\d+)/);
+  const gradleNameMatch = gradle.match(/versionName\s+"([^"]+)"/);
+
+  assert.ok(gradleCodeMatch, 'versionCode missing in build.gradle');
+  assert.ok(gradleNameMatch, 'versionName missing in build.gradle');
+  assert.equal(Number(gradleCodeMatch[1]), pkg.androidVersionCode);
+  assert.equal(gradleNameMatch[1], pkg.version);
+  assert.equal(sandbox.BABYTRACK_VERSION.versionName, pkg.version);
+  assert.equal(sandbox.BABYTRACK_VERSION.versionCode, pkg.androidVersionCode);
+});

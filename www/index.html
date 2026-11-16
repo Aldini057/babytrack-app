@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>BabyTrack — Control Prenatal y Recuerdos</title>
   <link rel="stylesheet" href="vendor/tailwind.css">
+  <script src="js/version.js"></script>
   <script src="js/calculator.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/calendar.js"></script>
@@ -627,6 +628,7 @@
           <button @click="saveCalibration(false)" class="w-1/2 py-2 bg-gray-200 rounded-xl font-bold">Guardar FPP</button>
           <button @click="saveCalibration(true)" class="w-1/2 py-2 bg-theme-primary text-white rounded-xl font-bold">Calibrar Semanas</button>
         </div>
+        <p class="text-[10px] text-center text-gray-400 pt-2 border-t border-gray-100" x-text="'BabyTrack v' + (window.BABYTRACK_VERSION?.versionName || '0.2.0') + ' (build ' + (window.BABYTRACK_VERSION?.versionCode || 2) + ') · ' + (window.BABYTRACK_VERSION?.stage || 'Beta')"></p>
       </div>
     </div>
   </div>

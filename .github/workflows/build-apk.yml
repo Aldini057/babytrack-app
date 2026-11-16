@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
@@ -16,6 +18,16 @@ jobs:
     steps:
       - name: Descargar código
         uses: actions/checkout@v4
+
+      - name: Leer versión del proyecto
+        id: meta
+        run: |
+          APP_VER=$(node -p "require('./package.json').version")
+          APP_CODE=$(node -p "require('./package.json').androidVersionCode || 1")
+          IS_PRE=$( [[ "$APP_VER" == 0.* || "$APP_VER" == *-* ]] && echo "true" || echo "false" )
+          echo "version=$APP_VER" >> "$GITHUB_OUTPUT"
+          echo "code=$APP_CODE" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$IS_PRE" >> "$GITHUB_OUTPUT"
 
       - name: Configurar Node.js 22
         uses: actions/setup-node@v4
@@ -36,7 +48,7 @@ jobs:
           ./scripts/build-web.sh
           npx cap sync android
 
-      - name: Ejecutar pruebas de lógica obstétrica y exportación
+      - name: Ejecutar pruebas de lógica obstétrica, versiones y exportación
         run: npm test
 
       - name: Compilar APK de pruebas (assembleDebug)
@@ -45,27 +57,42 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Renombrar APK listo para instalar
+      - name: Renombrar APK listo para instalar y rollback
         run: |
           mkdir -p dist
           cp android/app/build/outputs/apk/debug/app-debug.apk dist/BabyTrack-debug.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk "dist/BabyTrack-v${{ steps.meta.outputs.version }}-debug.apk"
 
       - name: Subir APK como Artefacto de GitHub Actions
         uses: actions/upload-artifact@v4
         with:
-          name: BabyTrack-Android-APK
-          path: dist/BabyTrack-debug.apk
-          retention-days: 30
+          name: BabyTrack-Android-APK-v${{ steps.meta.outputs.version }}
+          path: dist/BabyTrack-v${{ steps.meta.outputs.version }}-debug.apk
+          retention-days: 90
 
-      - name: Publicar última compilación en Releases (descarga directa 1 toque)
+      - name: Actualizar última compilación móvil (latest-apk en pushes a main)
+        if: github.ref_type == 'branch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-apk
-          name: "BabyTrack Android APK (Última compilación)"
+          name: "BabyTrack Android APK (Última compilación · v${{ steps.meta.outputs.version }})"
           body: |
-            Descarga directa del archivo `.apk` compilado automáticamente desde `main`.
+            Última compilación automática desde `main` (`v${{ steps.meta.outputs.version }}`, Android `versionCode ${{ steps.meta.outputs.code }}`).
             Compatible con Android 6.0 hasta Android 14 (MagicOS 8) y 15.
           files: dist/BabyTrack-debug.apk
           prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publicar Release histórico versionado (tags v* para rollback)
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "BabyTrack v${{ steps.meta.outputs.version }} (build ${{ steps.meta.outputs.code }})"
+          body: |
+            Versión etiquetada `${{ github.ref_name }}` (`versionCode ${{ steps.meta.outputs.code }}`).
+            Consulta todos los cambios en `CHANGELOG.md`. Este APK permanece guardado de forma permanente por si necesitas hacer rollback.
+          files: dist/BabyTrack-v${{ steps.meta.outputs.version }}-debug.apk
+          prerelease: ${{ steps.meta.outputs.prerelease }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
