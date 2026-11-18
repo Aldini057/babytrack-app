@@ -45,8 +45,26 @@ window.BabyDB = (() => {
         familyCloudEndpoint: '',
         premiumBookUnlocked: false,
         adsRemoved: false,
-        dismissedMilestones: []
+        dismissedMilestones: [],
+        settingsUpdatedAt: '1970-01-01T00:00:00.000Z',
+        coupleSync: window.BabySync
+          ? window.BabySync.createDefaultCoupleSync()
+          : {
+              deviceId: 'bt-' + Math.random().toString(36).slice(2, 8),
+              googleEmail: '',
+              googleName: '',
+              role: '',
+              folderId: '',
+              folderName: '',
+              fileId: '',
+              fileName: '',
+              fileWebLink: '',
+              partnerEmail: '',
+              lastSyncAt: '',
+              lastSyncSummary: ''
+            }
       },
+      deletedTombstones: {},
       appointments: [],
       studies: [],
       fetalLogs: [],
@@ -54,6 +72,15 @@ window.BabyDB = (() => {
       journal: [],
       moments: []
     };
+  }
+
+  function hydrateLoadedState(raw) {
+    const def = createDefaultState();
+    const merged = Object.assign(def, raw || {});
+    merged.settings = Object.assign(def.settings, raw?.settings || {});
+    merged.settings.coupleSync = Object.assign(def.settings.coupleSync, raw?.settings?.coupleSync || {});
+    merged.deletedTombstones = Object.assign({}, raw?.deletedTombstones || {});
+    return window.BabySync ? window.BabySync.ensureSyncMetadata(merged) : merged;
   }
 
   function openDb() {
@@ -82,26 +109,21 @@ window.BabyDB = (() => {
         const req = tx.objectStore(STORE_NAME).get(STATE_KEY);
         req.onsuccess = () => {
           if (req.result) {
-            const merged = Object.assign(createDefaultState(), req.result);
-            merged.settings = Object.assign(createDefaultState().settings, req.result.settings || {});
-            resolve(merged);
+            resolve(hydrateLoadedState(req.result));
           } else {
-            resolve(createDefaultState());
+            resolve(hydrateLoadedState(createDefaultState()));
           }
         };
-        req.onerror = () => resolve(createDefaultState());
+        req.onerror = () => resolve(hydrateLoadedState(createDefaultState()));
       });
     } catch {
       try {
         const raw = localStorage.getItem(DB_NAME);
         if (raw) {
-          const parsed = JSON.parse(raw);
-          const merged = Object.assign(createDefaultState(), parsed);
-          merged.settings = Object.assign(createDefaultState().settings, parsed.settings || {});
-          return merged;
+          return hydrateLoadedState(JSON.parse(raw));
         }
       } catch {}
-      return createDefaultState();
+      return hydrateLoadedState(createDefaultState());
     }
   }
 

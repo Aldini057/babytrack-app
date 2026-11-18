@@ -3,6 +3,14 @@
 Este proyecto sigue **SemVer pre-`1.0.0`** (`0.MINOR.PATCH`) y mantiene sincronizado el `versionCode` de Android para permitir actualizar el APK sobre instalaciones previas sin borrar datos locales ni hacer rollbacks limpios desde GitHub Releases.
 
 <!-- CHANGELOG_ENTRIES -->
+## [0.6.0] (build 7) — 2026-11-18
+### Sincronización en Pareja vía Google Drive (`drive.file`, $0 Servidor, 100% Opcional)
+- **Carpeta y archivo compartido en Google Drive del usuario:** Un celular crea la carpeta `BabyTrack Pareja · <Apodo>` y el archivo compartido `babytrack-pareja.json` con permiso `drive.file` (solo accede a archivos creados/seleccionados por la app, nunca a otros archivos personales) y lo comparte por correo o WhatsApp con el otro celular.
+- **Plugin nativo Android `CoupleDrivePlugin`:** Autenticación OAuth nativa vía Google Play Services (`AuthorizationClient` + `play-services-auth:21.2.0`) sin costo ni servidor intermedio.
+- **Motor determinista de fusión sin conflictos (`BabySync`):** Combina citas, estudios, registros fetales, compras con costo real, cartas del diario y álbum de momentos de ambos celulares mediante `syncUid`, marcas temporales (`updatedAt`) y `deletedTombstones` + control de concurrencia optimista (`If-Match` ETag) para no sobrescribir cambios simultáneos.
+- **Fusión offline alternativa incluida:** Permite además fusionar manualmente un respaldo `.json` de la pareja desde el mismo modal de **💑 Sincronizar en Pareja** sin perder datos locales.
+- **CI con huella SHA-1 visible:** El workflow de GitHub Actions imprime la huella pública `SHA1`/`SHA256` del keystore fijo para configurar OAuth en Google Cloud Console.
+
 ## [0.5.0] (build 6) — 2026-11-18
 ### Limpieza de Interfaz: Sin PIN Interno ni Selector Global de Mamá/Papá
 - **Eliminación del bloqueo por PIN interno:** Se quita la pantalla de bloqueo por PIN y su configuración en Ajustes (los usuarios que deseen proteger la app pueden usar el bloqueo nativo de aplicaciones de Android/iOS).

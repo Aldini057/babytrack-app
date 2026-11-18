@@ -10,6 +10,8 @@
   <script src="js/storage.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/payments.js"></script>
+  <script src="js/sync_config.js"></script>
+  <script src="js/couple_sync.js"></script>
   <script src="js/db.js"></script>
   <script src="js/share_card.js"></script>
   <script src="js/export_pdf.js"></script>
@@ -680,7 +682,79 @@
           <button @click="saveCalibration(false)" class="w-1/2 py-2 bg-theme-kraft border border-theme rounded-xl font-bold">Guardar FPP</button>
           <button @click="saveCalibration(true)" class="w-1/2 py-2 bg-theme-primary text-white rounded-xl font-bold">Calibrar Semanas</button>
         </div>
-        <p class="text-[10px] text-center text-theme-muted pt-2 border-t border-dashed border-theme" x-text="'BabyTrack v' + (window.BABYTRACK_VERSION?.versionName || '0.5.0') + ' (build ' + (window.BABYTRACK_VERSION?.versionCode || 6) + ') · ' + (window.BABYTRACK_VERSION?.stage || 'Beta')"></p>
+        <p class="text-[10px] text-center text-theme-muted pt-2 border-t border-dashed border-theme" x-text="'BabyTrack v' + (window.BABYTRACK_VERSION?.versionName || '0.6.0') + ' (build ' + (window.BABYTRACK_VERSION?.versionCode || 7) + ') · ' + (window.BABYTRACK_VERSION?.stage || 'Beta')"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Sincronizar en Pareja (Google Drive drive.file + Fusión sin conflictos) -->
+  <div x-show="showCoupleSyncModal" x-cloak class="fixed inset-0 z-50 bg-[#2A201B]/60 flex items-center justify-center p-4">
+    <div @click.outside="showCoupleSyncModal = false" class="scrapbook-card washi-tape max-w-md w-full p-5 pt-6 space-y-3 max-h-[90vh] overflow-y-auto text-xs">
+      <div class="flex justify-between items-start gap-2">
+        <div>
+          <h3 class="text-base font-bold font-serif-editorial text-theme-ink">💑 Sincronizar en Pareja</h3>
+          <p class="text-[11px] text-theme-muted">Directo en su propio Google Drive · Costo $0 · Sin servidores externos</p>
+        </div>
+        <button type="button" @click="showCoupleSyncModal = false" class="text-xl font-bold text-theme-muted leading-none">&times;</button>
+      </div>
+
+      <div class="sticky-note p-2.5 text-[11px] text-amber-950 space-y-1">
+        <p class="font-extrabold">🔒 100% Privado y Opcional</p>
+        <p class="text-amber-900">BabyTrack solo pide acceso al archivo que tú crees o elijas (<code class="font-bold">drive.file</code>). Nunca lee tus otros archivos de Drive y fusiona cambios de ambos celulares sin sobrescribirlos.</p>
+      </div>
+
+      <div x-show="coupleSyncError" class="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-2.5 text-[11px] font-bold whitespace-pre-line" x-text="coupleSyncError"></div>
+
+      <!-- Paso 1: Conectar cuenta Google -->
+      <div class="scrapbook-kraft p-3 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <p class="font-extrabold text-theme-ink">1. Cuenta de Google Drive</p>
+            <p class="text-[11px] text-theme-muted" x-text="coupleSyncInfo.googleEmail ? ('Conectado: ' + coupleSyncInfo.googleEmail) : 'Conecta tu cuenta Google cuando quieras compartir en pareja'"></p>
+          </div>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold" :class="coupleSyncInfo.googleEmail ? 'bg-emerald-100 text-emerald-800' : 'bg-theme-surface text-theme-muted border border-theme'" x-text="coupleSyncInfo.googleEmail ? 'Lista' : 'Pendiente'"></span>
+        </div>
+        <button type="button" @click="connectGoogleForCoupleSync()" :disabled="coupleSyncBusy" class="w-full py-2 rounded-xl bg-theme-surface border border-theme text-theme-ink font-extrabold disabled:opacity-50" x-text="coupleSyncInfo.googleEmail ? '🔄 Reconectar / Verificar cuenta Google' : '🔗 Conectar mi cuenta Google'"></button>
+      </div>
+
+      <!-- Paso 2A: Quien crea la carpeta (Celular 1) -->
+      <div class="scrapbook-card p-3 space-y-2">
+        <p class="font-extrabold text-theme-ink">2A. Crear e invitar (Celular 1)</p>
+        <p class="text-[11px] text-theme-muted">Crea la carpeta compartida en tu Drive y dale acceso de edición al correo Gmail de tu pareja:</p>
+        <input type="email" x-model="coupleSyncPartnerEmail" placeholder="Correo Gmail de tu pareja (ej. pareja@gmail.com)" class="w-full px-3 py-2 bg-white border border-theme rounded-xl">
+        <button type="button" @click="createAndShareCoupleWorkspace()" :disabled="coupleSyncBusy" class="w-full py-2.5 rounded-xl bg-theme-primary text-white font-extrabold shadow-2xs disabled:opacity-50" x-text="coupleSyncBusy ? '⏳ Procesando...' : (hasCoupleSharedFile && coupleSyncInfo.role === 'CREATOR' ? '📨 Actualizar invitación y sincronizar' : '📁 Crear carpeta compartida e invitar')"></button>
+        <button type="button" x-show="hasCoupleSharedFile" @click="shareCoupleInviteWhatsApp()" class="w-full py-2 rounded-xl bg-theme-sticky border border-amber-300/70 text-amber-950 font-bold">📲 Avisar a mi pareja por WhatsApp</button>
+      </div>
+
+      <!-- Paso 2B: Pareja que se une (Celular 2) -->
+      <div class="scrapbook-card p-3 space-y-2">
+        <p class="font-extrabold text-theme-ink">2B. Ya me compartieron (Celular 2)</p>
+        <p class="text-[11px] text-theme-muted">Si tu pareja ya te invitó, elige el archivo compartido <span class="font-bold">babytrack-pareja.json</span> desde tu Drive:</p>
+        <button type="button" @click="pickPartnerSharedFile()" :disabled="coupleSyncBusy" class="w-full py-2.5 rounded-xl bg-theme-accent text-white font-extrabold shadow-2xs disabled:opacity-50">📂 Elegir archivo compartido de mi pareja</button>
+        <p x-show="!pickerConfigured" class="text-[10px] text-theme-muted">Nota: Para abrir el selector web de Drive en el Celular 2 es necesario agregar tu API Key y Project Number en <code class="font-bold">sync_config.js</code>.</p>
+      </div>
+
+      <!-- Estado y sincronización inmediata -->
+      <div x-show="hasCoupleSharedFile" class="scrapbook-card p-3 space-y-2 border-2 border-theme">
+        <div class="flex items-center justify-between">
+          <span class="font-extrabold text-theme-primary" x-text="'📄 ' + (coupleSyncInfo.fileName || 'babytrack-pareja.json')"></span>
+          <span class="text-[10px] text-theme-muted font-bold" x-text="formattedLastSync"></span>
+        </div>
+        <p x-show="coupleSyncInfo.lastSyncSummary" class="text-[11px] text-theme-muted" x-text="coupleSyncInfo.lastSyncSummary"></p>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" @click="runCoupleSyncNow()" :disabled="coupleSyncBusy" class="py-2 rounded-xl bg-theme-primary text-white font-extrabold disabled:opacity-50">🔄 Sincronizar ahora</button>
+          <button type="button" @click="unlinkCoupleSync()" :disabled="coupleSyncBusy" class="py-2 rounded-xl bg-theme-kraft border border-theme text-rose-700 font-bold">Desvincular</button>
+        </div>
+      </div>
+
+      <!-- Fusión segura manual (.json) sin sobrescribir cambios -->
+      <div class="scrapbook-kraft p-3 space-y-1.5">
+        <p class="font-bold text-theme-ink">📥 Fusión manual sin sobrescribir (.json)</p>
+        <p class="text-[10px] text-theme-muted">También puedes fusionar un respaldo <code class="font-bold">.json</code> de tu pareja conservando las cartas, compras y citas de ambos:</p>
+        <label class="block w-full py-2 px-3 rounded-xl bg-theme-surface text-theme-primary border border-theme font-bold text-center cursor-pointer">
+          🤝 Fusionar respaldo .json de mi pareja
+          <input type="file" accept=".json,application/json" class="hidden" @change="importAndMergePartnerJson($event)">
+        </label>
       </div>
     </div>
   </div>

@@ -22,7 +22,7 @@ function loadBrowserScripts() {
   };
   sandbox.window = sandbox;
 
-  for (const fname of ['calculator.js', 'calendar.js', 'payments.js', 'db.js', 'share_card.js', 'export_pdf.js', 'scrapbook_mascot.js']) {
+  for (const fname of ['calculator.js', 'calendar.js', 'payments.js', 'sync_config.js', 'couple_sync.js', 'db.js', 'share_card.js', 'export_pdf.js', 'scrapbook_mascot.js']) {
     const code = fs.readFileSync(path.join(wwwJsDir, fname), 'utf-8');
     vm.runInNewContext(code, sandbox, { filename: fname });
   }
@@ -215,4 +215,108 @@ test('babyTrackApp checklist tracks real purchase cost, gifts ($0), and uncheck 
   assert.equal(app.checklistStats.act, 0);
 });
 
+test('BabySync.mergeStates merges concurrent edits on 2 phones without losing data or colliding IDs', () => {
+  const { BabyDB, BabySync } = loadBrowserScripts();
 
+  // Teléfono de Mamá (device A)
+  const momState = BabyDB.createDefaultState();
+  momState.settings.coupleSync.deviceId = 'dev-mama';
+  momState.settings.coupleSync.googleEmail = 'mama@gmail.com';
+  momState.settings.adsRemoved = true;
+  momState.settings.premiumBookUnlocked = true;
+  momState.settings.babyNickname = 'Santi';
+  momState.settings.settingsUpdatedAt = '2026-11-18T10:00:00.000Z';
+  BabySync.ensureSyncMetadata(momState);
+
+  // Mamá compra artículo #1 (Cuna) en $3,900 y escribe una carta (id local 101)
+  momState.checklist[0].isCompleted = true;
+  momState.checklist[0].actualCostMxn = 3900;
+  momState.checklist[0].updatedAt = '2026-11-18T10:05:00.000Z';
+  momState.journal.unshift({
+    id: 101,
+    syncUid: 'dev-mama-101',
+    updatedAt: '2026-11-18T10:10:00.000Z',
+    authorRole: 'MAMA',
+    authorDisplayName: 'Mamá',
+    title: 'Hola bebé',
+    content: 'Te esperamos con ilusión',
+    gestationalWeek: 12,
+    gestationalDay: 0,
+    createdAt: '2026-11-18T10:10:00.000Z'
+  });
+
+  // Teléfono de Papá (device B) — offline al mismo tiempo
+  const dadState = BabyDB.createDefaultState();
+  dadState.settings.coupleSync.deviceId = 'dev-papa';
+  dadState.settings.coupleSync.googleEmail = 'papa@gmail.com';
+  dadState.settings.adsRemoved = false;
+  BabySync.ensureSyncMetadata(dadState);
+
+  // Papá compra artículo #5 (Carriola) en $4,800 y escribe otra carta con el MISMO id local 101
+  dadState.checklist[4].isCompleted = true;
+  dadState.checklist[4].actualCostMxn = 4800;
+  dadState.checklist[4].updatedAt = '2026-11-18T10:15:00.000Z';
+  dadState.journal.unshift({
+    id: 101,
+    syncUid: 'dev-papa-101',
+    updatedAt: '2026-11-18T10:20:00.000Z',
+    authorRole: 'PAPA',
+    authorDisplayName: 'Papá',
+    title: 'Carta de Papá',
+    content: 'Ya tenemos tu carriola',
+    gestationalWeek: 12,
+    gestationalDay: 0,
+    createdAt: '2026-11-18T10:20:00.000Z'
+  });
+
+  const { state: merged, stats } = BabySync.mergeStates(momState, dadState);
+
+  // Conserva ambas compras en el checklist sin duplicar los 16 artículos base
+  assert.equal(merged.checklist.length, 16);
+  assert.equal(merged.checklist[0].isCompleted, true);
+  assert.equal(merged.checklist[0].actualCostMxn, 3900);
+  assert.equal(merged.checklist[4].isCompleted, true);
+  assert.equal(merged.checklist[4].actualCostMxn, 4800);
+
+  // Conserva ambas cartas sin colisión de ID numérico para Alpine :key
+  assert.equal(merged.journal.length, 2);
+  assert.notEqual(merged.journal[0].id, merged.journal[1].id);
+  assert.ok(stats.added >= 1);
+
+  // Respeta credenciales y compras locales de Mamá sin que las de Papá las pisen
+  assert.equal(merged.settings.coupleSync.deviceId, 'dev-mama');
+  assert.equal(merged.settings.coupleSync.googleEmail, 'mama@gmail.com');
+  assert.equal(merged.settings.adsRemoved, true);
+  assert.equal(merged.settings.premiumBookUnlocked, true);
+  assert.equal(merged.settings.babyNickname, 'Santi');
+});
+
+test('BabySync respects deletedTombstones and sanitizes private fields before Drive upload', () => {
+  const { BabyDB, BabySync } = loadBrowserScripts();
+  const local = BabyDB.createDefaultState();
+  local.settings.coupleSync.deviceId = 'dev-1';
+  local.settings.coupleSync.googleEmail = 'privado@gmail.com';
+  local.settings.adsRemoved = true;
+  local.appointments.push({
+    id: 105,
+    syncUid: 'dev-1-105',
+    updatedAt: '2026-11-18T09:00:00.000Z',
+    appointmentType: 'MEDICO',
+    appointmentDate: '2026-12-01T10:00',
+    doctorOrClinic: 'Dra. Ana'
+  });
+
+  const remote = BabyDB.createDefaultState();
+  remote.settings.coupleSync.deviceId = 'dev-2';
+  remote.deletedTombstones = {
+    'dev-1-105': '2026-11-18T11:00:00.000Z' // borrada después de su creación
+  };
+
+  const { state: merged } = BabySync.mergeStates(local, remote);
+  assert.equal(merged.appointments.length, 0);
+
+  const sanitized = BabySync.sanitizeStateForUpload(local);
+  assert.equal(sanitized.settings.coupleSync, undefined);
+  assert.equal(sanitized.settings.adsRemoved, undefined);
+  assert.equal(sanitized.settings.premiumBookUnlocked, undefined);
+});
