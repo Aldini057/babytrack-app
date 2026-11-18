@@ -23,20 +23,6 @@
   <!-- Toast de confirmación -->
   <div x-show="toastMessage" x-cloak class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[#3A2E28] text-[#FFFDF7] text-xs font-bold px-4 py-2 rounded-full shadow-lg border border-white/15" x-text="toastMessage"></div>
 
-  <!-- BLOQUEO POR PIN (Opcional activado por el usuario) -->
-  <div x-show="locked" x-cloak class="fixed inset-0 z-50 bg-[#2A201B]/75 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="scrapbook-card washi-tape max-w-xs w-full p-6 pt-7 space-y-4 text-center">
-      <div class="text-4xl">🔐</div>
-      <h2 class="text-lg font-bold font-serif-editorial text-theme-ink">Diario Bloqueado</h2>
-      <p class="text-xs text-theme-muted">Ingresa tu PIN familiar para abrir tus recuerdos y datos privados.</p>
-      <form @submit.prevent="unlockWithPin()" class="space-y-3">
-        <input type="password" inputmode="numeric" maxlength="10" x-model="pinInput" placeholder="PIN" class="w-full px-4 py-2.5 bg-white border border-theme rounded-xl text-center text-lg font-black tracking-[0.35em]">
-        <p x-show="pinError" class="text-xs font-bold text-red-600" x-text="pinError"></p>
-        <button type="submit" class="w-full py-2.5 rounded-xl bg-theme-primary text-white text-xs font-extrabold shadow">Abrir Diario</button>
-      </form>
-    </div>
-  </div>
-
   <!-- ONBOARDING INICIAL (1ra vez en el teléfono) -->
   <div x-show="showOnboarding" x-cloak class="fixed inset-0 z-50 bg-[#2A201B]/60 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="scrapbook-card washi-tape max-w-md w-full p-6 pt-7 space-y-4">
@@ -90,9 +76,6 @@
       </div>
       <div class="flex items-center space-x-1.5">
         <button x-show="!state.settings.adsRemoved" @click="showTipModal = true" class="px-2.5 py-1 rounded-full text-[11px] font-bold border border-amber-300/80 bg-theme-sticky text-amber-900 shadow-2xs">☕ Apoyar</button>
-        <button @click="toggleActiveParent()" class="px-2.5 py-1 rounded-full text-[11px] font-bold border border-theme bg-theme-primary-light text-theme-primary">
-          <span x-text="state.settings.activeParent === 'MAMA' ? '👩 Mamá' : '👨 Papá'"></span>
-        </button>
         <button @click="openCalibrate()" class="px-2.5 py-1 rounded-full text-[11px] font-bold border border-theme bg-theme-surface text-theme-ink">⚙️</button>
       </div>
     </div>
@@ -672,10 +655,10 @@
     </div>
   </div>
 
-  <!-- Modal Calibración / Ajustes / PIN -->
+  <!-- Modal Calibración y Ajustes -->
   <div x-show="showCalibrateModal" x-cloak class="fixed inset-0 z-50 bg-[#2A201B]/55 flex items-center justify-center p-4">
     <div @click.outside="showCalibrateModal = false" class="scrapbook-card max-w-md w-full p-5 space-y-3 max-h-[90vh] overflow-y-auto">
-      <h3 class="text-sm font-bold font-serif-editorial text-theme-ink">⚙️ Ajustes, Calibración y Privacidad</h3>
+      <h3 class="text-sm font-bold font-serif-editorial text-theme-ink">⚙️ Ajustes y Calibración</h3>
       <div class="space-y-2 text-xs">
         <label class="block font-bold">Apodo del Bebé</label>
         <input type="text" x-model="calibrateForm.babyNickname" class="w-full px-3 py-2 bg-white border border-theme rounded-xl">
@@ -693,15 +676,11 @@
           <div><label class="block font-bold">Tipo de Sangre</label><input type="text" x-model="calibrateForm.momBloodType" placeholder="Ej. O+" class="w-full px-3 py-2 bg-white border border-theme rounded-xl"></div>
           <div><label class="block font-bold">Alergias</label><input type="text" x-model="calibrateForm.allergiesNotes" class="w-full px-3 py-2 bg-white border border-theme rounded-xl"></div>
         </div>
-        <div class="bg-theme-kraft p-2.5 rounded-xl border border-theme space-y-1.5">
-          <label class="flex items-center space-x-2 font-bold"><input type="checkbox" x-model="calibrateForm.pinEnabled"><span>🔐 Bloquear app con PIN al abrir</span></label>
-          <input x-show="calibrateForm.pinEnabled" type="text" inputmode="numeric" x-model="calibrateForm.pinCode" placeholder="PIN (ej. 1419)" class="w-full px-3 py-1.5 bg-white border border-theme rounded-lg">
-        </div>
         <div class="flex gap-2 pt-2">
           <button @click="saveCalibration(false)" class="w-1/2 py-2 bg-theme-kraft border border-theme rounded-xl font-bold">Guardar FPP</button>
           <button @click="saveCalibration(true)" class="w-1/2 py-2 bg-theme-primary text-white rounded-xl font-bold">Calibrar Semanas</button>
         </div>
-        <p class="text-[10px] text-center text-theme-muted pt-2 border-t border-dashed border-theme" x-text="'BabyTrack v' + (window.BABYTRACK_VERSION?.versionName || '0.4.0-scrapbook.1') + ' (build ' + (window.BABYTRACK_VERSION?.versionCode || 4) + ') · ' + (window.BABYTRACK_VERSION?.stage || 'Beta')"></p>
+        <p class="text-[10px] text-center text-theme-muted pt-2 border-t border-dashed border-theme" x-text="'BabyTrack v' + (window.BABYTRACK_VERSION?.versionName || '0.5.0') + ' (build ' + (window.BABYTRACK_VERSION?.versionCode || 6) + ') · ' + (window.BABYTRACK_VERSION?.stage || 'Beta')"></p>
       </div>
     </div>
   </div>

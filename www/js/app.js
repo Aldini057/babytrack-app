@@ -2,9 +2,6 @@
 function babyTrackApp() {
   return {
     loaded: false,
-    locked: false,
-    pinInput: '',
-    pinError: '',
     activeTab: 'inicio',
     medicalSubTab: 'citas',
     apptFilter: 'ALL',
@@ -37,7 +34,7 @@ function babyTrackApp() {
     shareCardBusy: false,
 
     // Formularios
-    calibrateForm: { dueDate: '', currentWeeks: 6, currentDays: 0, momBloodType: '', allergiesNotes: '', pinEnabled: false, pinCode: '1419', babyNickname: '', momName: '', dadName: '' },
+    calibrateForm: { dueDate: '', currentWeeks: 6, currentDays: 0, momBloodType: '', allergiesNotes: '', babyNickname: '', momName: '', dadName: '' },
     apptForm: { id: null, appointmentType: 'MEDICO', appointmentDate: '', doctorOrClinic: '', status: 'SCHEDULED', reminderMinutesBefore: '1440', momWeightKg: '', bloodPressure: '', babyHeartRateBpm: '', questionsForDoctor: '', doctorNotesAndDiagnosis: '' },
     studyForm: { studyType: 'DIAGNOSTICO', title: '', studyDate: '', appointmentId: '', summaryNotes: '', saveAsAppointment: false, appointmentTime: '08:00', pendingFiles: [] },
     checkForm: { category: 'ROPA', itemName: '', description: '', trimesterPriority: 2, estimatedCostMxn: 300 },
@@ -62,8 +59,6 @@ function babyTrackApp() {
         this.calibrateForm.momName = this.state.settings.momName;
         this.calibrateForm.dadName = this.state.settings.dadName;
         this.showOnboarding = true;
-      } else if (this.state.settings.pinEnabled) {
-        this.locked = true;
       }
 
       const today = BabyCalc.localIsoDate();
@@ -78,7 +73,6 @@ function babyTrackApp() {
       }
 
       this.$watch('hideAdsForEthics', () => this.syncAdBanner());
-      this.$watch('locked', () => this.syncAdBanner());
       this.$watch('showOnboarding', () => this.syncAdBanner());
       await this.syncAdBanner();
     },
@@ -157,9 +151,9 @@ function babyTrackApp() {
     },
 
     get hideAdsForEthics() {
-      // Regla de oro ética: nunca mostrar banner en Modo Consulta Médica, Cronómetro de Contracciones, Onboarding/PIN o si ya se desbloqueó
+      // Regla de oro ética: nunca mostrar banner en Modo Consulta Médica, Cronómetro de Contracciones, Onboarding o si ya se desbloqueó
       if (this.state.settings.adsRemoved || this.state.settings.premiumBookUnlocked) return true;
-      if (this.locked || this.showOnboarding) return true;
+      if (this.showOnboarding) return true;
       if (this.showConsultationDrawer) return true;
       if (this.activeTab === 'medico' && this.medicalSubTab === 'bienestar' && this.contractionTimer.active) return true;
       return false;
@@ -172,16 +166,6 @@ function babyTrackApp() {
         await window.BabyNative.hideBanner();
       } else {
         await window.BabyNative.showBanner(window.BabyMonetization?.ADMOB_TEST_BANNER_ANDROID);
-      }
-    },
-
-    unlockWithPin() {
-      if (this.pinInput.trim() === (this.state.settings.pinCode || '1419')) {
-        this.locked = false;
-        this.pinInput = '';
-        this.pinError = '';
-      } else {
-        this.pinError = 'PIN incorrecto';
       }
     },
 
@@ -207,11 +191,6 @@ function babyTrackApp() {
       await this.persist();
     },
 
-    async toggleActiveParent() {
-      this.state.settings.activeParent = this.state.settings.activeParent === 'MAMA' ? 'PAPA' : 'MAMA';
-      await this.persist();
-    },
-
     openCalibrate() {
       const m = this.metrics;
       this.calibrateForm = {
@@ -220,8 +199,6 @@ function babyTrackApp() {
         currentDays: m.days,
         momBloodType: this.state.settings.momBloodType || '',
         allergiesNotes: this.state.settings.allergiesNotes || '',
-        pinEnabled: !!this.state.settings.pinEnabled,
-        pinCode: this.state.settings.pinCode || '1419',
         babyNickname: this.state.settings.babyNickname,
         momName: this.state.settings.momName,
         dadName: this.state.settings.dadName
@@ -240,8 +217,6 @@ function babyTrackApp() {
       }
       this.state.settings.momBloodType = (this.calibrateForm.momBloodType || '').trim();
       this.state.settings.allergiesNotes = (this.calibrateForm.allergiesNotes || '').trim();
-      this.state.settings.pinEnabled = !!this.calibrateForm.pinEnabled;
-      if (this.calibrateForm.pinCode) this.state.settings.pinCode = this.calibrateForm.pinCode.trim();
       this.state.settings.babyNickname = (this.calibrateForm.babyNickname || 'Nuestro Bebé').trim();
       this.state.settings.momName = (this.calibrateForm.momName || 'Mamá').trim();
       this.state.settings.dadName = (this.calibrateForm.dadName || 'Papá').trim();
@@ -650,7 +625,7 @@ function babyTrackApp() {
         attachedImageDataUrl: this.journalForm.pendingPhoto,
         createdAt: new Date().toISOString()
       });
-      this.journalForm = { authorRole: this.state.settings.activeParent, authorDisplayName: '', title: '', content: '', pendingPhoto: null };
+      this.journalForm = { authorRole: role || 'MAMA', authorDisplayName: '', title: '', content: '', pendingPhoto: null };
       this.showJournalModal = false;
       await this.persist();
       this.notify('Carta guardada en tu Diario.');

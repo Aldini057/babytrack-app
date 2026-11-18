@@ -3,6 +3,11 @@
 Este proyecto sigue **SemVer pre-`1.0.0`** (`0.MINOR.PATCH`) y mantiene sincronizado el `versionCode` de Android para permitir actualizar el APK sobre instalaciones previas sin borrar datos locales ni hacer rollbacks limpios desde GitHub Releases.
 
 <!-- CHANGELOG_ENTRIES -->
+## [0.5.0] (build 6) — 2026-11-18
+### Limpieza de Interfaz: Sin PIN Interno ni Selector Global de Mamá/Papá
+- **Eliminación del bloqueo por PIN interno:** Se quita la pantalla de bloqueo por PIN y su configuración en Ajustes (los usuarios que deseen proteger la app pueden usar el bloqueo nativo de aplicaciones de Android/iOS).
+- **Eliminación del botón de cambio Mamá/Papá en cabecera:** La barra superior queda más limpia; la autoría entre `👩 Mamá` y `👨 Papá` se elige directamente al escribir cada carta en el Diario.
+
 ## [0.4.0] (build 5) — 2026-11-18
 ### Estilo Fijo Diario Scrapbook + Semillita y Control de Costo Real en Compras
 - **Diseño definitivo Diario Scrapbook + Semillita Compañera:** Fusionado a `main` como estilo fijo de la aplicación (papel kraft offline, cinta washi, Polaroids, hojas rayadas, fuentes locales `Lora`/`Caveat`/`Nunito` e íconos dibujados a mano en navegación, postal WhatsApp y Libro de Oro).

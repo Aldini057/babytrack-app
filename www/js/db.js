@@ -41,8 +41,6 @@ window.BabyDB = (() => {
         activeParent: 'MAMA',
         momBloodType: '',
         allergiesNotes: '',
-        pinEnabled: false,
-        pinCode: '1419',
         familyShareCode: 'bebe-' + Math.random().toString(36).slice(2, 7),
         familyCloudEndpoint: '',
         premiumBookUnlocked: false,
