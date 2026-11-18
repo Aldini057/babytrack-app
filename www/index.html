@@ -470,7 +470,7 @@
     <!-- TAB 3: CHECKLIST & AFILIADOS AMAZON MX                             -->
     <!-- ================================================================== -->
     <section x-show="activeTab === 'checklist'" x-cloak class="space-y-3">
-      <div class="scrapbook-card washi-tape p-4 pt-5 space-y-2">
+      <div class="scrapbook-card washi-tape p-4 pt-5 space-y-2.5">
         <div class="flex justify-between items-center">
           <div>
             <h2 class="text-base font-bold font-serif-editorial text-theme-ink">Checklist & Presupuesto</h2>
@@ -479,9 +479,13 @@
           <button @click="showChecklistModal = true" class="px-3 py-1.5 rounded-xl bg-theme-primary text-white text-xs font-bold shadow-2xs">+ Artículo</button>
         </div>
         <div class="w-full h-2.5 bg-theme-kraft rounded-full overflow-hidden border border-theme/60">
-          <div class="h-full bg-theme-accent" :style="'width:' + checklistStats.pct + '%'"></div>
+          <div class="h-full bg-theme-accent transition-all" :style="'width:' + checklistStats.pct + '%'"></div>
         </div>
-        <p class="text-[11px] text-theme-muted">Gastado: <strong class="text-theme-accent" x-text="'$' + checklistStats.act + ' MXN'"></strong> · Estimado total: <strong class="text-theme-ink" x-text="'$' + checklistStats.est + ' MXN'"></strong></p>
+        <div class="flex flex-wrap items-center justify-between gap-1 text-[11px] text-theme-muted">
+          <span>Gastado real: <strong class="text-theme-accent" x-text="'$' + checklistStats.act.toLocaleString('es-MX') + ' MXN'"></strong></span>
+          <span>Estimado total: <strong class="text-theme-ink" x-text="'$' + checklistStats.est.toLocaleString('es-MX') + ' MXN'"></strong></span>
+        </div>
+        <p x-show="checklistStats.done > 0" class="text-[10px] font-bold" :class="checklistStats.diff <= 0 ? 'text-theme-accent' : 'text-theme-primary'" x-text="checklistStats.diff < 0 ? ('✨ Ahorro acumulado vs estimado: $' + Math.abs(checklistStats.diff).toLocaleString('es-MX') + ' MXN') : (checklistStats.diff === 0 ? '🎯 Exactamente dentro de lo estimado' : ('📊 +' + checklistStats.diff.toLocaleString('es-MX') + ' MXN sobre lo estimado en lo comprado'))"></p>
       </div>
 
       <div class="flex space-x-1.5 overflow-x-auto pb-1">
@@ -493,12 +497,20 @@
       <div class="space-y-2">
         <template x-for="item in filteredChecklist" :key="item.id">
           <div class="scrapbook-card p-3 flex items-start justify-between gap-2">
-            <div class="flex items-start space-x-2.5">
-              <input type="checkbox" :checked="item.isCompleted" @change="toggleChecklistItem(item)" class="mt-1 w-4 h-4 rounded accent-[var(--bt-primary)]">
-              <div>
-                <p class="text-xs font-bold text-theme-ink" :class="item.isCompleted ? 'line-through opacity-50' : ''" x-text="item.itemName"></p>
-                <p class="text-[10px] text-theme-muted" x-text="item.description + ' · Est. $' + item.estimatedCostMxn + ' MXN'"></p>
-                <a :href="amazonLink(item)" target="_blank" class="inline-block mt-1.5 px-2.5 py-0.5 rounded-md bg-theme-sticky border border-amber-300/80 text-amber-950 text-[10px] font-bold">🛒 Ver opciones en Amazon MX</a>
+            <div class="flex items-start space-x-2.5 flex-1 min-w-0">
+              <input type="checkbox" :checked="item.isCompleted" @click.prevent="handleChecklistToggle(item)" class="mt-1 w-4 h-4 rounded accent-[var(--bt-primary)] cursor-pointer">
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold text-theme-ink" :class="item.isCompleted ? 'line-through opacity-60' : ''" x-text="item.itemName"></p>
+                <p class="text-[10px] text-theme-muted" x-text="item.description + ' · Est. $' + Number(item.estimatedCostMxn || 0).toLocaleString('es-MX') + ' MXN'"></p>
+                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  <template x-if="item.isCompleted">
+                    <span class="inline-flex items-center gap-1">
+                      <span class="px-2 py-0.5 rounded-md bg-theme-primary-light border border-theme text-theme-primary text-[10px] font-extrabold" x-text="Number(item.actualCostMxn || 0) === 0 ? '🎁 Regalo ($0 MXN)' : ('✅ Pagado: $' + Number(item.actualCostMxn || 0).toLocaleString('es-MX') + ' MXN')"></span>
+                      <button type="button" @click="openChecklistCostModal(item, true)" class="px-2 py-0.5 rounded-md bg-theme-kraft border border-theme text-theme-ink text-[10px] font-bold">✏️ Editar costo</button>
+                    </span>
+                  </template>
+                  <a :href="amazonLink(item)" target="_blank" class="inline-block px-2.5 py-0.5 rounded-md bg-theme-sticky border border-amber-300/80 text-amber-950 text-[10px] font-bold">🛒 Ver opciones en Amazon MX</a>
+                </div>
               </div>
             </div>
           </div>
@@ -793,6 +805,35 @@
         <input type="text" x-model="checkForm.itemName" required placeholder="Nombre del artículo" class="w-full px-3 py-2 bg-white border border-theme rounded-xl">
         <input type="number" x-model="checkForm.estimatedCostMxn" placeholder="Costo estimado MXN" class="w-full px-3 py-2 bg-white border border-theme rounded-xl">
         <button type="submit" class="w-full py-2.5 bg-theme-primary text-white rounded-xl font-bold">Agregar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Registrar / Editar Costo Real de Compra -->
+  <div x-show="showChecklistCostModal" x-cloak class="fixed inset-0 z-50 bg-[#2A201B]/60 flex items-center justify-center p-4">
+    <div @click.outside="showChecklistCostModal = false" class="scrapbook-card washi-tape max-w-sm w-full p-5 pt-6 space-y-3 text-xs">
+      <div class="flex justify-between items-start gap-2">
+        <div>
+          <h3 class="text-sm font-bold font-serif-editorial text-theme-ink" x-text="checklistCostForm.isEditing ? '✏️ Editar Costo Real' : '💳 ¿Cuánto costó realmente?'"></h3>
+          <p class="text-[11px] font-bold text-theme-primary mt-0.5" x-text="checklistCostForm.itemName"></p>
+        </div>
+        <button type="button" @click="showChecklistCostModal = false" class="text-xl font-bold text-theme-muted leading-none">&times;</button>
+      </div>
+      <p class="text-[11px] text-theme-muted" x-text="'Costo estimado de referencia: $' + Number(checklistCostForm.estimatedCostMxn || 0).toLocaleString('es-MX') + ' MXN'"></p>
+      <form @submit.prevent="confirmChecklistCost()" class="space-y-3">
+        <div class="relative flex items-center">
+          <span class="absolute left-3 font-extrabold text-theme-muted">$</span>
+          <input type="number" inputmode="decimal" step="0.01" min="0" required x-model="checklistCostForm.actualCostMxn" placeholder="0" class="w-full pl-7 pr-14 py-2.5 bg-white border border-theme rounded-xl text-base font-extrabold text-theme-ink">
+          <span class="absolute right-3 text-[11px] font-bold text-theme-muted">MXN</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" @click="checklistCostForm.actualCostMxn = 0" class="py-1.5 px-2 rounded-xl bg-theme-sticky border border-amber-300/70 text-amber-950 text-[11px] font-bold">🎁 Fue regalo ($0)</button>
+          <button type="button" @click="checklistCostForm.actualCostMxn = checklistCostForm.estimatedCostMxn" class="py-1.5 px-2 rounded-xl bg-theme-kraft border border-theme text-theme-ink text-[11px] font-bold" x-text="'📌 Estimado ($' + Number(checklistCostForm.estimatedCostMxn || 0).toLocaleString('es-MX') + ')'"></button>
+        </div>
+        <div class="flex gap-2 pt-1">
+          <button type="button" @click="showChecklistCostModal = false" class="w-1/2 py-2.5 border border-theme rounded-xl font-bold text-theme-muted">Cancelar</button>
+          <button type="submit" class="w-1/2 py-2.5 bg-theme-primary text-white rounded-xl font-extrabold shadow-2xs">✅ Guardar compra</button>
+        </div>
       </form>
     </div>
   </div>

@@ -25,6 +25,7 @@ function babyTrackApp() {
     showFamilyModal: false,
     showShareCardModal: false,
     showChecklistModal: false,
+    showChecklistCostModal: false,
     showJournalModal: false,
     showMomentModal: false,
     viewerItem: null,
@@ -40,6 +41,7 @@ function babyTrackApp() {
     apptForm: { id: null, appointmentType: 'MEDICO', appointmentDate: '', doctorOrClinic: '', status: 'SCHEDULED', reminderMinutesBefore: '1440', momWeightKg: '', bloodPressure: '', babyHeartRateBpm: '', questionsForDoctor: '', doctorNotesAndDiagnosis: '' },
     studyForm: { studyType: 'DIAGNOSTICO', title: '', studyDate: '', appointmentId: '', summaryNotes: '', saveAsAppointment: false, appointmentTime: '08:00', pendingFiles: [] },
     checkForm: { category: 'ROPA', itemName: '', description: '', trimesterPriority: 2, estimatedCostMxn: 300 },
+    checklistCostForm: { itemId: null, itemName: '', estimatedCostMxn: 0, actualCostMxn: 0, isEditing: false },
     journalForm: { authorRole: 'MAMA', authorDisplayName: '', title: '', content: '', pendingPhoto: null },
     momentForm: { title: '', momentDate: '', caption: '', pendingPhoto: null },
     familyNoteForm: { authorDisplayName: '', title: '', content: '' },
@@ -543,25 +545,62 @@ function babyTrackApp() {
 
     get checklistStats() {
       const items = this.state.checklist || [];
-      const done = items.filter(i => i.isCompleted).length;
+      const completedItems = items.filter(i => i.isCompleted);
+      const done = completedItems.length;
       const est = items.reduce((acc, i) => acc + Number(i.estimatedCostMxn || 0), 0);
-      const act = items.reduce((acc, i) => acc + Number(i.actualCostMxn || 0), 0);
-      return { total: items.length, done, pct: items.length ? Math.round((done / items.length) * 100) : 0, est, act };
+      const act = completedItems.reduce((acc, i) => acc + Number(i.actualCostMxn || 0), 0);
+      const doneEst = completedItems.reduce((acc, i) => acc + Number(i.estimatedCostMxn || 0), 0);
+      const diff = act - doneEst;
+      return { total: items.length, done, pct: items.length ? Math.round((done / items.length) * 100) : 0, est, act, doneEst, diff };
     },
 
     amazonLink(item) {
       return BabyDB.amazonAffiliateUrl(item);
     },
 
-    async toggleChecklistItem(item) {
-      item.isCompleted = !item.isCompleted;
+    openChecklistCostModal(item, isEditing = false) {
+      this.checklistCostForm = {
+        itemId: item.id,
+        itemName: item.itemName,
+        estimatedCostMxn: Number(item.estimatedCostMxn || 0),
+        actualCostMxn: isEditing ? Number(item.actualCostMxn || 0) : Number(item.estimatedCostMxn || 0),
+        isEditing
+      };
+      this.showChecklistCostModal = true;
+    },
+
+    async handleChecklistToggle(item) {
       if (item.isCompleted) {
-        item.completedBy = this.state.settings.activeParent;
-        if (!item.actualCostMxn) item.actualCostMxn = item.estimatedCostMxn;
-      } else {
+        item.isCompleted = false;
         item.completedBy = null;
+        item.actualCostMxn = 0;
+        await this.persist();
+        this.notify('Artículo marcado como pendiente.');
+      } else {
+        this.openChecklistCostModal(item, false);
       }
+    },
+
+    async confirmChecklistCost() {
+      const item = (this.state.checklist || []).find(i => i.id === this.checklistCostForm.itemId);
+      if (!item) {
+        this.showChecklistCostModal = false;
+        return;
+      }
+      const raw = Number(this.checklistCostForm.actualCostMxn);
+      const cleanCost = Number.isFinite(raw) && raw >= 0 ? Math.round(raw * 100) / 100 : 0;
+      item.isCompleted = true;
+      item.actualCostMxn = cleanCost;
+      if (!item.completedBy) item.completedBy = this.state.settings.activeParent;
+      this.showChecklistCostModal = false;
       await this.persist();
+      this.notify(this.checklistCostForm.isEditing
+        ? `Costo actualizado: $${cleanCost.toLocaleString('es-MX')} MXN`
+        : `Compra registrada: $${cleanCost.toLocaleString('es-MX')} MXN`);
+    },
+
+    async toggleChecklistItem(item) {
+      await this.handleChecklistToggle(item);
     },
 
     async addChecklistItem() {

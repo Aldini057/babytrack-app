@@ -174,3 +174,45 @@ test('BabyMascot evolves across pregnancy weeks and generates valid SVG', () => 
   assert.match(morning, /Buenos días, Ana y Luis/);
 });
 
+test('babyTrackApp checklist tracks real purchase cost, gifts ($0), and uncheck reset', async () => {
+  const sandbox = loadBrowserScripts();
+  sandbox.BabyDB.saveState = async () => true;
+  const appCode = fs.readFileSync(path.join(wwwJsDir, 'app.js'), 'utf-8');
+  vm.runInNewContext(appCode, sandbox, { filename: 'app.js' });
+
+  const app = sandbox.babyTrackApp();
+  app.notify = () => {};
+  const firstItem = app.state.checklist[0]; // est: 4500
+  const secondItem = app.state.checklist[1]; // est: 650
+
+  // Seleccionar artículo abre modal con costo estimado por defecto
+  await app.handleChecklistToggle(firstItem);
+  assert.equal(app.showChecklistCostModal, true);
+  assert.equal(firstItem.isCompleted, false);
+  assert.equal(app.checklistCostForm.actualCostMxn, 4500);
+
+  // Usuario ajusta a lo que realmente pagó (3900)
+  app.checklistCostForm.actualCostMxn = 3900;
+  await app.confirmChecklistCost();
+  assert.equal(firstItem.isCompleted, true);
+  assert.equal(firstItem.actualCostMxn, 3900);
+  assert.equal(app.checklistStats.act, 3900);
+  assert.equal(app.checklistStats.diff, -600);
+
+  // Segundo artículo fue regalo ($0)
+  await app.handleChecklistToggle(secondItem);
+  app.checklistCostForm.actualCostMxn = 0;
+  await app.confirmChecklistCost();
+  assert.equal(secondItem.isCompleted, true);
+  assert.equal(secondItem.actualCostMxn, 0);
+  assert.equal(app.checklistStats.act, 3900);
+  assert.equal(app.checklistStats.diff, -1250);
+
+  // Desmarcar reinicia actualCostMxn a 0 para no contaminar el total gastado
+  await app.handleChecklistToggle(firstItem);
+  assert.equal(firstItem.isCompleted, false);
+  assert.equal(firstItem.actualCostMxn, 0);
+  assert.equal(app.checklistStats.act, 0);
+});
+
+
