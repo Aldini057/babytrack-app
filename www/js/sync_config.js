@@ -4,11 +4,11 @@
 // el paquete com.babytrack.app + huella SHA-1 configurados en Google Cloud Console.
 window.BabySyncConfig = {
   // Número de proyecto numérico de Google Cloud Console (necesario como App ID en Google Picker)
-  GOOGLE_CLOUD_PROJECT_NUMBER: '',
+  GOOGLE_CLOUD_PROJECT_NUMBER: '1079143066290',
   // API Key de Google Cloud restringida a Google Picker API (usada para que el 2do celular seleccione babytrack-pareja.json)
-  GOOGLE_PICKER_API_KEY: '',
-  // Client ID tipo Web (opcional, requerido solo si tu configuración de Picker lo solicita)
-  GOOGLE_WEB_CLIENT_ID: '',
+  GOOGLE_PICKER_API_KEY: 'AIzaSyBaq_K-MMgi5o0yTAvfFn8czRovGiJE0zU',
+  // Client ID tipo Web (origen autorizado https://localhost en Capacitor WebView)
+  GOOGLE_WEB_CLIENT_ID: '1079143066290-ql4n3mco1gk6fv7d0511jssidmhjl5ht.apps.googleusercontent.com',
   // Nombres predeterminados en Google Drive
   SHARED_FOLDER_PREFIX: 'BabyTrack Pareja',
   SHARED_FILE_NAME: 'babytrack-pareja.json'

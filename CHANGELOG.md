@@ -3,6 +3,11 @@
 Este proyecto sigue **SemVer pre-`1.0.0`** (`0.MINOR.PATCH`) y mantiene sincronizado el `versionCode` de Android para permitir actualizar el APK sobre instalaciones previas sin borrar datos locales ni hacer rollbacks limpios desde GitHub Releases.
 
 <!-- CHANGELOG_ENTRIES -->
+## [0.6.1] (build 8) — 2026-11-18
+### Credenciales Google Cloud y Mejora de Google Picker para Sincronización en Pareja
+- **Configuración activa de Google Cloud (`sync_config.js`):** Cargados el Número de Proyecto (`1079143066290`), API Key de Google Picker y Client ID Web para habilitar la selección del archivo compartido `babytrack-pareja.json` en el 2do celular.
+- **Compatibilidad WebView en Google Picker (`couple_sync.js`):** Añadido `.setOrigin(window.location.origin)` (`https://localhost`) y una vista adicional de exploración completa como respaldo si el archivo compartido aún no aparece en la búsqueda rápida.
+
 ## [0.6.0] (build 7) — 2026-11-18
 ### Sincronización en Pareja vía Google Drive (`drive.file`, $0 Servidor, 100% Opcional)
 - **Carpeta y archivo compartido en Google Drive del usuario:** Un celular crea la carpeta `BabyTrack Pareja · <Apodo>` y el archivo compartido `babytrack-pareja.json` con permiso `drive.file` (solo accede a archivos creados/seleccionados por la app, nunca a otros archivos personales) y lo comparte por correo o WhatsApp con el otro celular.

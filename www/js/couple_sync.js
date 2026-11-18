@@ -620,15 +620,19 @@ window.BabySync = (() => {
     return await new Promise((resolve) => {
       const docsView = new window.google.picker.DocsView(window.google.picker.ViewId.DOCS)
         .setIncludeFolders(true)
-        .setMimeTypes('application/json')
         .setQuery(cfg.SHARED_FILE_NAME || 'babytrack-pareja.json');
+
+      const allDocsView = new window.google.picker.DocsView(window.google.picker.ViewId.DOCS)
+        .setIncludeFolders(true);
 
       const picker = new window.google.picker.PickerBuilder()
         .setTitle('Selecciona babytrack-pareja.json compartido')
+        .setOrigin(window.location.origin)
         .setAppId(String(cfg.GOOGLE_CLOUD_PROJECT_NUMBER))
         .setDeveloperKey(String(cfg.GOOGLE_PICKER_API_KEY))
         .setOAuthToken(accessToken)
         .addView(docsView)
+        .addView(allDocsView)
         .setCallback((data) => {
           const action = data?.[window.google.picker.Response.ACTION];
           if (action === window.google.picker.Action.PICKED) {
