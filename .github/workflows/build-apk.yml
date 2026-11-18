@@ -51,6 +51,16 @@ jobs:
       - name: Ejecutar pruebas de lógica obstétrica, versiones y exportación
         run: npm test
 
+      - name: Restaurar llave de firma fija (evita conflictos de actualización en Android)
+        env:
+          KEYSTORE_B64: ${{ secrets.BABYTRACK_DEBUG_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            mkdir -p "$HOME/.android"
+            printf '%s' "$KEYSTORE_B64" | base64 -d > "$HOME/.android/debug.keystore"
+            echo "Keystore fijo restaurado correctamente."
+          fi
+
       - name: Compilar APK de pruebas (assembleDebug)
         working-directory: android
         run: |

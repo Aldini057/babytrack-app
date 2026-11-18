@@ -47,6 +47,7 @@ function babyTrackApp() {
     // Bienestar fetal en tiempo real
     kickCounter: { count: 0, startedAtMs: null, elapsedSeconds: 0, intervalId: null },
     contractionTimer: { active: false, startedAtMs: null, lastStartedAtMs: null, elapsedSeconds: 0, intervalId: null },
+    adBannerHeightPx: 0,
     toastMessage: '',
 
     async init() {
@@ -67,6 +68,12 @@ function babyTrackApp() {
       this.studyForm.studyDate = today;
       this.momentForm.momentDate = today;
       this.loaded = true;
+
+      if (window.BabyNative && typeof window.BabyNative.onBannerSizeChange === 'function') {
+        window.BabyNative.onBannerSizeChange((height) => {
+          this.adBannerHeightPx = this.hideAdsForEthics ? 0 : Math.max(0, Number(height || 0));
+        });
+      }
 
       this.$watch('hideAdsForEthics', () => this.syncAdBanner());
       this.$watch('locked', () => this.syncAdBanner());
@@ -107,6 +114,12 @@ function babyTrackApp() {
       return !!(window.BabyNative && window.BabyNative.isNative());
     },
 
+    get effectiveBottomAdHeight() {
+      if (this.hideAdsForEthics) return 0;
+      if (this.isNativeApp) return this.adBannerHeightPx || 0;
+      return 38;
+    },
+
     get activeMilestonePrompt() {
       const w = this.metrics.weeks;
       const dismissed = this.state.settings.dismissedMilestones || [];
@@ -128,6 +141,7 @@ function babyTrackApp() {
     async syncAdBanner() {
       if (!this.isNativeApp) return;
       if (this.hideAdsForEthics) {
+        this.adBannerHeightPx = 0;
         await window.BabyNative.hideBanner();
       } else {
         await window.BabyNative.showBanner(window.BabyMonetization?.ADMOB_TEST_BANNER_ANDROID);

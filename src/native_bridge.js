@@ -1,18 +1,40 @@
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { AdMob, BannerAdPosition, BannerAdSize } from '@capacitor-community/admob';
+import { AdMob, BannerAdPosition, BannerAdSize, BannerAdPluginEvents } from '@capacitor-community/admob';
 
 let admobInitialized = false;
-let bannerVisible = false;
+let bannerCreated = false;
+let sizeListenerRegistered = false;
+let bannerSizeCallback = null;
 
 function isNative() {
   return Capacitor.isNativePlatform();
 }
 
+function emitBannerHeight(height) {
+  if (typeof bannerSizeCallback === 'function') {
+    bannerSizeCallback(Math.max(0, Number(height || 0)));
+  }
+}
+
+function onBannerSizeChange(cb) {
+  bannerSizeCallback = cb;
+}
+
 async function initAdMob() {
-  if (!isNative() || admobInitialized) return false;
+  if (!isNative() || admobInitialized) return admobInitialized;
   try {
+    if (!sizeListenerRegistered) {
+      sizeListenerRegistered = true;
+      await AdMob.addListener(BannerAdPluginEvents.SizeChanged, (info) => {
+        emitBannerHeight(info?.height || 0);
+      });
+      await AdMob.addListener(BannerAdPluginEvents.FailedToLoad, () => {
+        bannerCreated = false;
+        emitBannerHeight(0);
+      });
+    }
     await AdMob.initialize({
       initializeForTesting: true,
     });
@@ -31,28 +53,32 @@ async function showBanner(adId) {
       const ok = await initAdMob();
       if (!ok) return false;
     }
-    if (bannerVisible) {
+    if (bannerCreated) {
       await AdMob.resumeBanner();
       return true;
     }
     const unitId = adId || window.BabyMonetization?.ADMOB_TEST_BANNER_ANDROID || 'ca-app-pub-3940256099942544/6300978111';
     await AdMob.showBanner({
       adId: unitId,
-      adSize: BannerAdSize.BANNER,
+      adSize: BannerAdSize.ADAPTIVE_BANNER,
       position: BannerAdPosition.BOTTOM_CENTER,
-      margin: 64,
+      margin: 0,
       isTesting: true,
     });
-    bannerVisible = true;
+    bannerCreated = true;
     return true;
   } catch (err) {
+    bannerCreated = false;
+    emitBannerHeight(0);
     console.warn('BabyNative showBanner warning:', err?.message || err);
     return false;
   }
 }
 
 async function hideBanner() {
-  if (!isNative() || !bannerVisible) return false;
+  if (!isNative()) return false;
+  emitBannerHeight(0);
+  if (!bannerCreated) return true;
   try {
     await AdMob.hideBanner();
     return true;
@@ -106,5 +132,6 @@ window.BabyNative = {
   initAdMob,
   showBanner,
   hideBanner,
+  onBannerSizeChange,
   shareImageAndText,
 };

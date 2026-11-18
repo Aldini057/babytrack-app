@@ -89,7 +89,7 @@
   </header>
 
   <!-- CONTENIDO PRINCIPAL -->
-  <main class="max-w-lg mx-auto px-4 py-4 space-y-4" :class="hideAdsForEthics ? 'pb-24' : 'pb-36'">
+  <main class="max-w-lg mx-auto px-4 py-4 space-y-4 transition-all duration-200" :style="'padding-bottom: ' + (88 + effectiveBottomAdHeight) + 'px'">
 
     <!-- ================================================================== -->
     <!-- TAB 1: INICIO                                                      -->
@@ -510,19 +510,8 @@
 
   </main>
 
-  <!-- BANNER INFERIOR ÉTICO (AdMob real en Android; vista previa discreta en navegador) -->
-  <div x-show="!hideAdsForEthics && !isNativeApp" x-cloak class="fixed bottom-16 left-0 right-0 z-20 max-w-lg mx-auto px-3">
-    <div class="bg-white/95 border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm flex items-center justify-between text-[10px]">
-      <div class="flex items-center space-x-2">
-        <span class="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-bold">Anuncio</span>
-        <span class="text-gray-600 font-medium">Banner discreto AdMob (en APK Android)</span>
-      </div>
-      <button @click="showBookModal = true" class="text-theme-primary font-bold underline">Quitar con Libro $49</button>
-    </div>
-  </div>
-
-  <!-- BARRA DE NAVEGACIÓN INFERIOR -->
-  <nav class="fixed bottom-0 left-0 right-0 z-30 bg-theme-surface/95 backdrop-blur-md border-t border-theme pb-safe">
+  <!-- BARRA DE NAVEGACIÓN INFERIOR (se eleva automáticamente encima del banner cuando hay anuncio) -->
+  <nav class="fixed left-0 right-0 z-30 bg-theme-surface/95 backdrop-blur-md border-t border-theme transition-all duration-200" :class="effectiveBottomAdHeight === 0 ? 'pb-safe' : ''" :style="'bottom: ' + effectiveBottomAdHeight + 'px'">
     <div class="max-w-lg mx-auto grid grid-cols-4 gap-1 px-2 py-1.5">
       <button @click="activeTab = 'inicio'" :class="activeTab === 'inicio' ? 'text-theme-primary font-extrabold' : 'text-theme-muted'" class="flex flex-col items-center py-1 text-[11px]"><span class="text-lg">🏠</span><span>Inicio</span></button>
       <button @click="activeTab = 'medico'" :class="activeTab === 'medico' ? 'text-theme-primary font-extrabold' : 'text-theme-muted'" class="flex flex-col items-center py-1 text-[11px]"><span class="text-lg">🩺</span><span>Médico</span></button>
@@ -530,6 +519,17 @@
       <button @click="activeTab = 'diario'" :class="activeTab === 'diario' ? 'text-theme-primary font-extrabold' : 'text-theme-muted'" class="flex flex-col items-center py-1 text-[11px]"><span class="text-lg">💌</span><span>Diario</span></button>
     </div>
   </nav>
+
+  <!-- BANNER INFERIOR ÉTICO (En Android el banner AdMob real va hasta abajo; en navegador se previsualiza aquí) -->
+  <div x-show="!hideAdsForEthics && !isNativeApp" x-cloak class="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-200 h-[38px]">
+    <div class="max-w-lg mx-auto px-3 h-full flex items-center justify-between text-[10px]">
+      <div class="flex items-center space-x-2">
+        <span class="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-bold">Anuncio</span>
+        <span class="text-gray-600 font-medium">Banner AdMob pegado abajo (sube el menú)</span>
+      </div>
+      <button @click="showBookModal = true" class="text-theme-primary font-bold underline">Quitar con Libro $49</button>
+    </div>
+  </div>
 
   <!-- ==================================================================== -->
   <!-- MODALES & DRAWERS                                                    -->

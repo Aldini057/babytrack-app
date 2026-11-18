@@ -3,6 +3,11 @@
 Este proyecto sigue **SemVer pre-`1.0.0`** (`0.MINOR.PATCH`) y mantiene sincronizado el `versionCode` de Android para permitir actualizar el APK sobre instalaciones previas sin borrar datos locales ni hacer rollbacks limpios desde GitHub Releases.
 
 <!-- CHANGELOG_ENTRIES -->
+## [0.3.0] (build 3) — 2026-11-18
+### Corrección de Firma de Paquete y Banner AdMob en Base Inferior
+- **Llave de firma fija en CI (`BABYTRACK_DEBUG_KEYSTORE_B64`):** A partir de `v0.3.0` todas las compilaciones futuras se firman con el mismo certificado, permitiendo actualizar el APK encima sin conflictos de paquete ni desinstalar.
+- **Banner AdMob Adaptativo pegado abajo:** El anuncio (`ADAPTIVE_BANNER`, `margin: 0`) se ancla al borde inferior absoluto de la app y eleva dinámicamente toda la barra de navegación y el contenido mediante `BannerAdPluginEvents.SizeChanged` sin tapar ningún botón.
+
 
 ## [0.2.0] (build 2) — 2026-11-16
 ### Fase 1 — Monetización Ética y Compartir Visual

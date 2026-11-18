@@ -1,7 +1,7 @@
 {
   "name": "babytrack-app",
-  "version": "0.2.0",
-  "androidVersionCode": 2,
+  "version": "0.3.0",
+  "androidVersionCode": 3,
   "description": "BabyTrack App Móvil Comercial (Local-First Android/iOS con Capacitor, SQLite, Modo Consulta, Librito Editorial PDF y Vista Familiar)",
   "main": "index.js",
   "scripts": {
