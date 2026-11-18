@@ -3,6 +3,13 @@
 Este proyecto sigue **SemVer pre-`1.0.0`** (`0.MINOR.PATCH`) y mantiene sincronizado el `versionCode` de Android para permitir actualizar el APK sobre instalaciones previas sin borrar datos locales ni hacer rollbacks limpios desde GitHub Releases.
 
 <!-- CHANGELOG_ENTRIES -->
+## [0.4.0-scrapbook.1] (build 4) — 2026-11-18
+### Rama Experimental de Diseño: Diario Scrapbook + Semillita Compañera
+- **Estética Diario Scrapbook (Opción B):** Fondo cálido de papel kraft con textura ligera offline, tarjetas tipo cuaderno artesanal, cintas washi decorativas, marcos Polaroid inclinados para ultrasonidos y álbum de momentos, notas adhesivas y hojas rayadas para las cartas del diario.
+- **Semillita Compañera (Opción C):** Mascota vectorial ligera (`BabyMascot`) que crece semana a semana desde semillita dormida hasta brote, capullo y flor, acompañada de mensajes cálidos con la voz del bebé y saludo personalizado según la hora del día.
+- **Tipografía offline ligera (~145 KB):** Fuentes locales `Lora` (editorial), `Caveat` (manuscrita) y `Nunito` (lectura suave) + íconos dibujados a mano en la barra inferior.
+- **Coherencia visual total:** Tarjeta PNG de WhatsApp y Libro de Oro actualizados al estilo Scrapbook manteniendo 100% intacta toda la lógica, datos locales y banner inferior AdMob.
+
 ## [0.3.0] (build 3) — 2026-11-18
 ### Corrección de Firma de Paquete y Banner AdMob en Base Inferior
 - **Llave de firma fija en CI (`BABYTRACK_DEBUG_KEYSTORE_B64`):** A partir de `v0.3.0` todas las compilaciones futuras se firman con el mismo certificado, permitiendo actualizar el APK encima sin conflictos de paquete ni desinstalar.

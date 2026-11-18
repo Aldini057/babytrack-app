@@ -2,9 +2,53 @@
 @source "../www/**/*.html";
 @source "../www/**/*.js";
 
+/* Offline Local Fonts (~145 KB total) */
+@font-face {
+  font-family: "NunitoLocal";
+  src: url("../fonts/nunito-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "NunitoLocal";
+  src: url("../fonts/nunito-latin-700-normal.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "NunitoLocal";
+  src: url("../fonts/nunito-latin-800-normal.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "LoraLocal";
+  src: url("../fonts/lora-latin-600-normal.woff2") format("woff2");
+  font-weight: 600 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "LoraLocal";
+  src: url("../fonts/lora-latin-400-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "CaveatLocal";
+  src: url("../fonts/caveat-latin-600-normal.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: "NunitoLocal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: contain;
   }
@@ -12,50 +56,207 @@
 
 [x-cloak] { display: none !important; }
 
-/* Dynamic Gender Theme Variables */
+/* Dynamic Scrapbook Gender Themes */
 :root,
 body[data-theme="SURPRISE"] {
-  --bt-bg: #FFF9F3;
-  --bt-surface: #FFFFFF;
-  --bt-primary: #E07A5F;
-  --bt-primary-light: #FDF0EB;
-  --bt-accent: #81B29A;
-  --bt-text: #2D3142;
-  --bt-muted: #6E7285;
-  --bt-border: #F2E3D5;
+  --bt-bg: #F3E9DC;
+  --bt-surface: #FFFDF7;
+  --bt-kraft: #EADACA;
+  --bt-sticky: #FEF5D4;
+  --bt-primary: #C8644B;
+  --bt-primary-light: #FBEBE5;
+  --bt-accent: #6B8E76;
+  --bt-text: #3A2E28;
+  --bt-muted: #7D6E65;
+  --bt-border: #DECBB7;
+  --bt-tape: rgba(223, 191, 145, 0.78);
+  --bt-tape-stripe: rgba(255, 253, 247, 0.28);
 }
 
 body[data-theme="BOY"] {
-  --bt-bg: #F3F8FE;
-  --bt-surface: #FFFFFF;
-  --bt-primary: #3B82F6;
-  --bt-primary-light: #EFF6FF;
-  --bt-accent: #14B8A6;
-  --bt-text: #1E293B;
-  --bt-muted: #64748B;
-  --bt-border: #DBEAFE;
+  --bt-bg: #EAE5DD;
+  --bt-surface: #FCFBF7;
+  --bt-kraft: #DDE4E8;
+  --bt-sticky: #EEF5F9;
+  --bt-primary: #3B6E8C;
+  --bt-primary-light: #E8F1F6;
+  --bt-accent: #5D9285;
+  --bt-text: #27323A;
+  --bt-muted: #63737E;
+  --bt-border: #CBD6DD;
+  --bt-tape: rgba(154, 189, 207, 0.78);
+  --bt-tape-stripe: rgba(255, 255, 255, 0.3);
 }
 
 body[data-theme="GIRL"] {
-  --bt-bg: #FFF5F8;
-  --bt-surface: #FFFFFF;
-  --bt-primary: #EC4899;
-  --bt-primary-light: #FDF2F8;
-  --bt-accent: #A855F7;
-  --bt-text: #33202A;
-  --bt-muted: #7C6370;
-  --bt-border: #FCE7F3;
+  --bt-bg: #F1E6E4;
+  --bt-surface: #FFFBF9;
+  --bt-kraft: #EFE0DD;
+  --bt-sticky: #FCEEF1;
+  --bt-primary: #B85C6F;
+  --bt-primary-light: #FAEBEF;
+  --bt-accent: #8C7284;
+  --bt-text: #3B262B;
+  --bt-muted: #7B6066;
+  --bt-border: #E4CCD0;
+  --bt-tape: rgba(226, 174, 185, 0.78);
+  --bt-tape-stripe: rgba(255, 253, 249, 0.32);
 }
 
-.bg-theme-app { background-color: var(--bt-bg); color: var(--bt-text); }
+/* Kraft Paper Texture (100% offline, ultra-light inline pattern) */
+.bg-theme-app {
+  background-color: var(--bt-bg);
+  background-image:
+    radial-gradient(rgba(78, 59, 49, 0.055) 0.75px, transparent 0.75px),
+    radial-gradient(rgba(255, 253, 247, 0.4) 0.75px, transparent 0.75px);
+  background-size: 18px 18px;
+  background-position: 0 0, 9px 9px;
+  color: var(--bt-text);
+}
+
 .bg-theme-surface { background-color: var(--bt-surface); }
+.bg-theme-kraft { background-color: var(--bt-kraft); }
+.bg-theme-sticky { background-color: var(--bt-sticky); }
 .bg-theme-primary { background-color: var(--bt-primary); }
 .bg-theme-primary-light { background-color: var(--bt-primary-light); }
+.bg-theme-accent { background-color: var(--bt-accent); }
 .text-theme-primary { color: var(--bt-primary); }
+.text-theme-accent { color: var(--bt-accent); }
 .text-theme-muted { color: var(--bt-muted); }
+.text-theme-ink { color: var(--bt-text); }
 .border-theme { border-color: var(--bt-border); }
 .border-theme-primary { border-color: var(--bt-primary); }
-.shadow-theme { box-shadow: 0 8px 24px -6px rgba(45, 49, 66, 0.08); }
+
+.font-serif-editorial {
+  font-family: "LoraLocal", Georgia, "Times New Roman", serif;
+}
+
+.font-handwriting {
+  font-family: "CaveatLocal", "LoraLocal", cursive, serif;
+}
+
+/* Paper & Scrapbook Surfaces */
+.shadow-theme {
+  box-shadow: 0 8px 20px -8px rgba(58, 46, 40, 0.16), 0 2px 4px -1px rgba(58, 46, 40, 0.06);
+}
+
+.scrapbook-card {
+  position: relative;
+  background-color: var(--bt-surface);
+  border: 1.5px solid var(--bt-border);
+  border-radius: 1.35rem;
+  box-shadow: 0 6px 16px -6px rgba(58, 46, 40, 0.14), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+}
+
+.scrapbook-kraft {
+  position: relative;
+  background-color: var(--bt-kraft);
+  border: 1.5px dashed var(--bt-border);
+  border-radius: 1.35rem;
+  box-shadow: 0 4px 12px -6px rgba(58, 46, 40, 0.12);
+}
+
+.sticky-note {
+  position: relative;
+  background-color: var(--bt-sticky);
+  border: 1px solid rgba(180, 145, 86, 0.25);
+  border-radius: 0.45rem 0.45rem 1.1rem 0.45rem;
+  box-shadow: 2px 4px 10px -3px rgba(58, 46, 40, 0.14);
+}
+
+/* Washi Tape Strip */
+.washi-tape {
+  position: relative;
+}
+.washi-tape::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  width: 78px;
+  height: 17px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--bt-tape),
+    var(--bt-tape) 6px,
+    var(--bt-tape-stripe) 6px,
+    var(--bt-tape-stripe) 10px
+  );
+  border-left: 1px dotted rgba(58, 46, 40, 0.15);
+  border-right: 1px dotted rgba(58, 46, 40, 0.15);
+  box-shadow: 0 1px 2px rgba(58, 46, 40, 0.12);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.washi-tape-corner {
+  position: relative;
+}
+.washi-tape-corner::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: 16px;
+  transform: rotate(12deg);
+  width: 54px;
+  height: 14px;
+  background: var(--bt-tape);
+  box-shadow: 0 1px 2px rgba(58, 46, 40, 0.12);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Polaroid Frame */
+.polaroid-frame {
+  position: relative;
+  background-color: #FFFDF9;
+  padding: 7px 7px 14px 7px;
+  border: 1px solid var(--bt-border);
+  border-radius: 0.4rem;
+  box-shadow: 0 6px 14px -4px rgba(58, 46, 40, 0.18);
+  transition: transform 0.2s ease;
+}
+.polaroid-tilt-left { transform: rotate(-1.4deg); }
+.polaroid-tilt-right { transform: rotate(1.3deg); }
+.polaroid-frame:active { transform: rotate(0deg) scale(0.99); }
+
+/* Rubber Stamp Badge */
+.scrapbook-stamp {
+  display: inline-flex;
+  align-items: center;
+  border: 1.5px dashed var(--bt-primary);
+  color: var(--bt-primary);
+  background-color: var(--bt-primary-light);
+  border-radius: 9999px;
+  transform: rotate(-1.5deg);
+}
+
+/* Lined Diary Paper */
+.diary-lined {
+  background-color: var(--bt-surface);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 23px,
+    rgba(198, 174, 148, 0.22) 23px,
+    rgba(198, 174, 148, 0.22) 24px
+  );
+  background-position: 0 8px;
+}
+
+/* Gentle breathing animation for Semillita */
+@keyframes mascotFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+}
+.mascot-float {
+  animation: mascotFloat 3.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mascot-float { animation: none; }
+  .polaroid-tilt-left, .polaroid-tilt-right { transform: none; }
+}
 
 /* Safe areas for Android 14 / Edge-to-edge / Notches */
 .pt-safe { padding-top: max(env(safe-area-inset-top), 0.75rem); }

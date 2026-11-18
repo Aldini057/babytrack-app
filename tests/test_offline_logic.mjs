@@ -22,7 +22,7 @@ function loadBrowserScripts() {
   };
   sandbox.window = sandbox;
 
-  for (const fname of ['calculator.js', 'calendar.js', 'payments.js', 'db.js', 'share_card.js', 'export_pdf.js']) {
+  for (const fname of ['calculator.js', 'calendar.js', 'payments.js', 'db.js', 'share_card.js', 'export_pdf.js', 'scrapbook_mascot.js']) {
     const code = fs.readFileSync(path.join(wwwJsDir, fname), 'utf-8');
     vm.runInNewContext(code, sandbox, { filename: fname });
   }
@@ -156,3 +156,21 @@ test('Version consistency across package.json, build.gradle, and www/js/version.
   assert.equal(sandbox.BABYTRACK_VERSION.versionName, pkg.version);
   assert.equal(sandbox.BABYTRACK_VERSION.versionCode, pkg.androidVersionCode);
 });
+
+test('BabyMascot evolves across pregnancy weeks and generates valid SVG', () => {
+  const { BabyMascot } = loadBrowserScripts();
+  const early = BabyMascot.getStage(4, 'Santi');
+  const mid = BabyMascot.getStage(22, 'Santi');
+  const late = BabyMascot.getStage(39, 'Santi');
+  assert.equal(early.id, 'seed');
+  assert.equal(mid.id, 'blossom');
+  assert.equal(late.id, 'ready');
+  assert.match(early.message, /Santi/);
+
+  const svg = BabyMascot.svgMarkup(24, 'BOY');
+  assert.match(svg, /^[\s\S]*<svg[\s\S]*<\/svg>[\s\S]*$/);
+
+  const morning = BabyMascot.greeting('Ana', 'Luis', 'MAMA', new Date(2026, 10, 18, 9, 0));
+  assert.match(morning, /Buenos días, Ana y Luis/);
+});
+

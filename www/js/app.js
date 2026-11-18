@@ -110,6 +110,31 @@ function babyTrackApp() {
       return BabyCalc.formatGestationalAge(this.metrics.weeks, this.metrics.days);
     },
 
+    get warmGreeting() {
+      if (window.BabyMascot) {
+        return window.BabyMascot.greeting(
+          this.state.settings.momName,
+          this.state.settings.dadName,
+          this.state.settings.activeParent
+        );
+      }
+      return `Hola, ${this.state.settings.momName} y ${this.state.settings.dadName}`;
+    },
+
+    get mascotStage() {
+      if (window.BabyMascot) {
+        return window.BabyMascot.getStage(this.metrics.weeks, this.state.settings.babyNickname);
+      }
+      return { id: 'seed', title: 'Semillita', message: 'Creciendo contigo cada día', growthStageIndex: 1, totalStages: 9 };
+    },
+
+    get mascotSvg() {
+      if (window.BabyMascot) {
+        return window.BabyMascot.svgMarkup(this.metrics.weeks, this.state.settings.genderMode || 'SURPRISE');
+      }
+      return '';
+    },
+
     get isNativeApp() {
       return !!(window.BabyNative && window.BabyNative.isNative());
     },
