@@ -41,30 +41,10 @@ window.BabyDB = (() => {
         activeParent: 'MAMA',
         momBloodType: '',
         allergiesNotes: '',
-        familyShareCode: 'bebe-' + Math.random().toString(36).slice(2, 7),
-        familyCloudEndpoint: '',
         premiumBookUnlocked: false,
         adsRemoved: false,
-        dismissedMilestones: [],
-        settingsUpdatedAt: '1970-01-01T00:00:00.000Z',
-        coupleSync: window.BabySync
-          ? window.BabySync.createDefaultCoupleSync()
-          : {
-              deviceId: 'bt-' + Math.random().toString(36).slice(2, 8),
-              googleEmail: '',
-              googleName: '',
-              role: '',
-              folderId: '',
-              folderName: '',
-              fileId: '',
-              fileName: '',
-              fileWebLink: '',
-              partnerEmail: '',
-              lastSyncAt: '',
-              lastSyncSummary: ''
-            }
+        dismissedMilestones: []
       },
-      deletedTombstones: {},
       appointments: [],
       studies: [],
       fetalLogs: [],
@@ -78,9 +58,7 @@ window.BabyDB = (() => {
     const def = createDefaultState();
     const merged = Object.assign(def, raw || {});
     merged.settings = Object.assign(def.settings, raw?.settings || {});
-    merged.settings.coupleSync = Object.assign(def.settings.coupleSync, raw?.settings?.coupleSync || {});
-    merged.deletedTombstones = Object.assign({}, raw?.deletedTombstones || {});
-    return window.BabySync ? window.BabySync.ensureSyncMetadata(merged) : merged;
+    return merged;
   }
 
   function openDb() {

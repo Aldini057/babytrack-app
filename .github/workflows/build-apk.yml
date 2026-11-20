@@ -59,8 +59,6 @@ jobs:
             mkdir -p "$HOME/.android"
             printf '%s' "$KEYSTORE_B64" | base64 -d > "$HOME/.android/debug.keystore"
             echo "Keystore fijo restaurado correctamente."
-            echo "=== Huella pública del certificado Android (para Google Cloud Console OAuth) ==="
-            keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android | grep -E "SHA1:|SHA256:" || true
           fi
 
       - name: Compilar APK de pruebas (assembleDebug)

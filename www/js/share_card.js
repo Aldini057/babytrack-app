@@ -158,11 +158,6 @@ window.BabyShareCard = (() => {
     const filledBlocks = Math.max(1, Math.round((metrics.progressPercent / 100) * 10));
     const progressBar = '▓'.repeat(filledBlocks) + '░'.repeat(10 - filledBlocks);
 
-    const cloudUrl = (settings.familyCloudEndpoint || '').trim();
-    const cloudSection = cloudUrl
-      ? `\n\n💌 *Déjanos una cartita privada para el bebé y mira los ecos aquí:*\n${cloudUrl}`
-      : '';
-
     return [
       `🍼 *Actualización de ${settings.babyNickname}*`,
       `${genderLine}`,
@@ -171,7 +166,6 @@ window.BabyShareCard = (() => {
       `📊 *Avance:* ${progressBar} *${metrics.progressPercent}%*`,
       `${metrics.sizeEmoji} *Tamaño equivalente hoy:* ${metrics.sizeComparison} (${metrics.sizeWeight})`,
       `⏳ *Faltan:* ${metrics.daysRemaining} días (FPP: ${settings.dueDate})`,
-      cloudSection,
       `\n_Enviado con amor por ${settings.momName} y ${settings.dadName} · BabyTrack_`
     ].filter((v) => v !== null && v !== undefined).join('\n').replace(/\n{3,}/g, '\n\n');
   }

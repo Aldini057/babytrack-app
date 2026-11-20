@@ -1,4 +1,4 @@
-// BabyTrack Mobile — Controlador Principal Alpine.js (100% Local-First + Híbrido Familiar)
+// BabyTrack Mobile — Controlador Principal Alpine.js (100% Local-First)
 function babyTrackApp() {
   return {
     loaded: false,
@@ -19,20 +19,12 @@ function babyTrackApp() {
     showStudyModal: false,
     showBookModal: false,
     showTipModal: false,
-    showFamilyModal: false,
     showShareCardModal: false,
-    showCoupleSyncModal: false,
     showChecklistModal: false,
     showChecklistCostModal: false,
     showJournalModal: false,
     showMomentModal: false,
     viewerItem: null,
-
-    // Sincronización en Pareja (Google Drive drive.file)
-    coupleSyncBusy: false,
-    coupleSyncError: '',
-    coupleSyncPartnerEmail: '',
-    coupleSyncAccessToken: '',
 
     // Tarjeta visual de WhatsApp
     shareCardIncludeEco: true,
@@ -58,10 +50,6 @@ function babyTrackApp() {
 
     async init() {
       this.state = await BabyDB.loadState();
-      if (window.BabySync) {
-        BabySync.ensureSyncMetadata(this.state);
-      }
-      this.coupleSyncPartnerEmail = this.state.settings?.coupleSync?.partnerEmail || '';
       this.applyTheme(this.state.settings.genderMode || 'SURPRISE');
 
       if (!this.state.settings.onboarded) {
@@ -104,18 +92,6 @@ function babyTrackApp() {
     nextId() {
       this.state.nextId = (this.state.nextId || 100) + 1;
       return this.state.nextId;
-    },
-
-    newSyncUid() {
-      const devId = this.state?.settings?.coupleSync?.deviceId || 'local';
-      if (window.BabySync) return BabySync.newUid(devId);
-      return `${devId}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    },
-
-    recordTombstone(syncUid) {
-      if (!syncUid) return;
-      if (!this.state.deletedTombstones) this.state.deletedTombstones = {};
-      this.state.deletedTombstones[syncUid] = new Date().toISOString();
     },
 
     get metrics() {
@@ -201,7 +177,6 @@ function babyTrackApp() {
         this.state.settings.calibrationOffsetDays = 0;
       }
       this.state.settings.onboarded = true;
-      this.state.settings.settingsUpdatedAt = new Date().toISOString();
       this.showOnboarding = false;
       await this.persist();
       this.notify('¡Bienvenidos a BabyTrack! Todo guardado en tu teléfono.');
@@ -212,7 +187,6 @@ function babyTrackApp() {
       this.applyTheme(mode);
       if (mode === 'BOY' && this.state.settings.babyNickname === 'Nuestro Bebé') this.state.settings.babyNickname = 'Nuestro Niño';
       if (mode === 'GIRL' && this.state.settings.babyNickname === 'Nuestro Bebé') this.state.settings.babyNickname = 'Nuestra Niña';
-      this.state.settings.settingsUpdatedAt = new Date().toISOString();
       await this.persist();
     },
 
@@ -245,7 +219,6 @@ function babyTrackApp() {
       this.state.settings.babyNickname = (this.calibrateForm.babyNickname || 'Nuestro Bebé').trim();
       this.state.settings.momName = (this.calibrateForm.momName || 'Mamá').trim();
       this.state.settings.dadName = (this.calibrateForm.dadName || 'Papá').trim();
-      this.state.settings.settingsUpdatedAt = new Date().toISOString();
       this.showCalibrateModal = false;
       await this.persist();
       this.notify('Configuración guardada localmente.');
@@ -325,13 +298,8 @@ function babyTrackApp() {
         this.state.settings.calibrationOffsetDays,
         this.apptForm.appointmentDate.slice(0, 10)
       );
-      const existing = this.apptForm.id
-        ? (this.state.appointments || []).find(x => x.id === this.apptForm.id)
-        : null;
       const item = {
         id: this.apptForm.id || this.nextId(),
-        syncUid: existing?.syncUid || this.newSyncUid(),
-        updatedAt: new Date().toISOString(),
         appointmentType: this.apptForm.appointmentType || 'MEDICO',
         appointmentDate: this.apptForm.appointmentDate,
         doctorOrClinic: this.apptForm.doctorOrClinic.trim(),
@@ -361,8 +329,6 @@ function babyTrackApp() {
 
     async deleteAppointment(id) {
       if (!confirm('¿Eliminar esta cita?')) return;
-      const target = (this.state.appointments || []).find(a => a.id === id);
-      if (target?.syncUid) this.recordTombstone(target.syncUid);
       this.state.appointments = this.state.appointments.filter(a => a.id !== id);
       await this.persist();
     },
@@ -414,14 +380,11 @@ function babyTrackApp() {
     },
 
     async saveStudy() {
-      const nowIso = new Date().toISOString();
       if (this.studyForm.studyType === 'LABORATORIO' && this.studyForm.saveAsAppointment) {
         const dtStr = `${this.studyForm.studyDate}T${this.studyForm.appointmentTime || '08:00'}`;
         const m = BabyCalc.calculateMetrics(this.state.settings.dueDate, this.state.settings.calibrationOffsetDays, this.studyForm.studyDate);
         this.state.appointments.push({
           id: this.nextId(),
-          syncUid: this.newSyncUid(),
-          updatedAt: nowIso,
           appointmentType: 'LABORATORIO',
           appointmentDate: dtStr,
           doctorOrClinic: this.studyForm.title.trim(),
@@ -443,8 +406,6 @@ function babyTrackApp() {
       const m = BabyCalc.calculateMetrics(this.state.settings.dueDate, this.state.settings.calibrationOffsetDays, this.studyForm.studyDate);
       this.state.studies.unshift({
         id: this.nextId(),
-        syncUid: this.newSyncUid(),
-        updatedAt: nowIso,
         studyType: this.studyForm.studyType,
         title: this.studyForm.title.trim(),
         studyDate: this.studyForm.studyDate,
@@ -464,8 +425,6 @@ function babyTrackApp() {
 
     async deleteStudy(id) {
       if (!confirm('¿Eliminar este registro?')) return;
-      const target = (this.state.studies || []).find(s => s.id === id);
-      if (target?.syncUid) this.recordTombstone(target.syncUid);
       this.state.studies = this.state.studies.filter(s => s.id !== id);
       await this.persist();
     },
@@ -497,13 +456,10 @@ function babyTrackApp() {
     async saveKickSession() {
       if (this.kickCounter.count === 0) return;
       const m = this.metrics;
-      const nowIso = new Date().toISOString();
       this.state.fetalLogs.unshift({
         id: this.nextId(),
-        syncUid: this.newSyncUid(),
-        updatedAt: nowIso,
         logType: 'PATADITAS',
-        recordedAt: nowIso,
+        recordedAt: new Date().toISOString(),
         gestationalWeek: m.weeks,
         gestationalDay: m.days,
         kickCount: this.kickCounter.count,
@@ -536,13 +492,10 @@ function babyTrackApp() {
         this.contractionTimer.elapsedSeconds = 0;
 
         const m = this.metrics;
-        const nowIso = new Date().toISOString();
         this.state.fetalLogs.unshift({
           id: this.nextId(),
-          syncUid: this.newSyncUid(),
-          updatedAt: nowIso,
           logType: 'CONTRACCION',
-          recordedAt: nowIso,
+          recordedAt: new Date().toISOString(),
           gestationalWeek: m.weeks,
           gestationalDay: m.days,
           durationSeconds: dur,
@@ -554,8 +507,6 @@ function babyTrackApp() {
     },
 
     async deleteFetalLog(id) {
-      const target = (this.state.fetalLogs || []).find(f => f.id === id);
-      if (target?.syncUid) this.recordTombstone(target.syncUid);
       this.state.fetalLogs = this.state.fetalLogs.filter(f => f.id !== id);
       await this.persist();
     },
@@ -597,7 +548,6 @@ function babyTrackApp() {
         item.isCompleted = false;
         item.completedBy = null;
         item.actualCostMxn = 0;
-        item.updatedAt = new Date().toISOString();
         await this.persist();
         this.notify('Artículo marcado como pendiente.');
       } else {
@@ -615,7 +565,6 @@ function babyTrackApp() {
       const cleanCost = Number.isFinite(raw) && raw >= 0 ? Math.round(raw * 100) / 100 : 0;
       item.isCompleted = true;
       item.actualCostMxn = cleanCost;
-      item.updatedAt = new Date().toISOString();
       if (!item.completedBy) item.completedBy = this.state.settings.activeParent;
       this.showChecklistCostModal = false;
       await this.persist();
@@ -631,8 +580,6 @@ function babyTrackApp() {
     async addChecklistItem() {
       this.state.checklist.push({
         id: this.nextId(),
-        syncUid: this.newSyncUid(),
-        updatedAt: new Date().toISOString(),
         category: this.checkForm.category,
         itemName: this.checkForm.itemName.trim(),
         description: this.checkForm.description.trim(),
@@ -666,11 +613,8 @@ function babyTrackApp() {
       const m = this.metrics;
       const role = this.journalForm.authorRole;
       const displayName = role === 'MAMA' ? this.state.settings.momName : (role === 'PAPA' ? this.state.settings.dadName : (this.journalForm.authorDisplayName || 'Familiar'));
-      const nowIso = new Date().toISOString();
       this.state.journal.unshift({
         id: this.nextId(),
-        syncUid: this.newSyncUid(),
-        updatedAt: nowIso,
         authorRole: role,
         authorDisplayName: displayName,
         title: this.journalForm.title.trim(),
@@ -678,7 +622,7 @@ function babyTrackApp() {
         gestationalWeek: m.weeks,
         gestationalDay: m.days,
         attachedImageDataUrl: this.journalForm.pendingPhoto,
-        createdAt: nowIso
+        createdAt: new Date().toISOString()
       });
       this.journalForm = { authorRole: role || 'MAMA', authorDisplayName: '', title: '', content: '', pendingPhoto: null };
       this.showJournalModal = false;
@@ -698,8 +642,6 @@ function babyTrackApp() {
       const m = BabyCalc.calculateMetrics(this.state.settings.dueDate, this.state.settings.calibrationOffsetDays, this.momentForm.momentDate);
       this.state.moments.unshift({
         id: this.nextId(),
-        syncUid: this.newSyncUid(),
-        updatedAt: new Date().toISOString(),
         title: this.momentForm.title.trim(),
         caption: this.momentForm.caption.trim(),
         momentDate: this.momentForm.momentDate,
@@ -714,7 +656,7 @@ function babyTrackApp() {
       this.notify('Momento agregado al álbum.');
     },
 
-    // --- HÍBRIDO FAMILIAR (TARJETA PNG + WHATSAPP + CLOUD RUN LINK) ---
+    // --- TARJETA VISUAL LOCAL (PNG + WHATSAPP) ---
     get latestUltrasoundImage() {
       const ecos = this.ultrasounds || [];
       for (const eco of ecos) {
@@ -765,230 +707,19 @@ function babyTrackApp() {
 
     async saveFamilyNoteLocal() {
       const m = this.metrics;
-      const nowIso = new Date().toISOString();
       this.state.journal.unshift({
         id: this.nextId(),
-        syncUid: this.newSyncUid(),
-        updatedAt: nowIso,
         authorRole: 'FAMILIA',
         authorDisplayName: this.familyNoteForm.authorDisplayName.trim(),
         title: this.familyNoteForm.title.trim(),
         content: this.familyNoteForm.content.trim(),
         gestationalWeek: m.weeks,
         gestationalDay: m.days,
-        createdAt: nowIso
+        createdAt: new Date().toISOString()
       });
       this.familyNoteForm = { authorDisplayName: '', title: '', content: '' };
       await this.persist();
       this.notify('Mensaje familiar guardado en tu Diario privado.');
-    },
-
-    // --- SINCRONIZACIÓN EN PAREJA (GOOGLE DRIVE drive.file + FUSIÓN SIN CONFLICTOS) ---
-    get coupleSyncInfo() {
-      return this.state?.settings?.coupleSync || {};
-    },
-
-    get hasCoupleSharedFile() {
-      return !!(this.coupleSyncInfo?.fileId);
-    },
-
-    get pickerConfigured() {
-      const cfg = window.BabySyncConfig || {};
-      return !!(cfg.GOOGLE_PICKER_API_KEY && cfg.GOOGLE_CLOUD_PROJECT_NUMBER);
-    },
-
-    get formattedLastSync() {
-      const iso = this.coupleSyncInfo?.lastSyncAt;
-      if (!iso) return 'Aún sin sincronizar';
-      try {
-        return new Date(iso).toLocaleString('es-MX', {
-          day: '2-digit',
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      } catch {
-        return iso.slice(0, 16).replace('T', ' ');
-      }
-    },
-
-    openCoupleSyncModal() {
-      this.coupleSyncError = '';
-      this.coupleSyncPartnerEmail = this.coupleSyncInfo?.partnerEmail || '';
-      this.showCoupleSyncModal = true;
-    },
-
-    async ensureDriveAccessToken() {
-      if (this.coupleSyncAccessToken) return this.coupleSyncAccessToken;
-      if (!window.BabyNative || typeof window.BabyNative.authorizeGoogleDrive !== 'function') {
-        throw new Error('Puente nativo de Google Drive no disponible.');
-      }
-      const auth = await window.BabyNative.authorizeGoogleDrive();
-      if (!auth?.ok || !auth.accessToken) {
-        if (auth?.canceled) throw new Error('Conexión cancelada.');
-        throw new Error(auth?.error || 'No se pudo autorizar Google Drive.');
-      }
-      this.coupleSyncAccessToken = auth.accessToken;
-      return auth.accessToken;
-    },
-
-    async connectGoogleForCoupleSync() {
-      this.coupleSyncBusy = true;
-      this.coupleSyncError = '';
-      try {
-        this.coupleSyncAccessToken = '';
-        const token = await this.ensureDriveAccessToken();
-        const profile = await BabySync.fetchGoogleProfile(token);
-        if (!this.state.settings.coupleSync) {
-          this.state.settings.coupleSync = BabySync.createDefaultCoupleSync();
-        }
-        this.state.settings.coupleSync.googleEmail = profile.email || '';
-        this.state.settings.coupleSync.googleName = profile.displayName || '';
-        await this.persist();
-        this.notify(profile.email ? `Conectado como ${profile.email}` : 'Cuenta Google conectada (solo Drive de BabyTrack).');
-      } catch (err) {
-        this.coupleSyncError = err?.message || String(err);
-      } finally {
-        this.coupleSyncBusy = false;
-      }
-    },
-
-    async createAndShareCoupleWorkspace() {
-      this.coupleSyncBusy = true;
-      this.coupleSyncError = '';
-      try {
-        const token = await this.ensureDriveAccessToken();
-        const cs = this.state.settings.coupleSync || BabySync.createDefaultCoupleSync();
-        const ws = await BabySync.findOrCreateSharedWorkspace(
-          token,
-          this.state.settings.babyNickname,
-          cs.folderId,
-          cs.fileId
-        );
-        cs.role = 'CREATOR';
-        cs.folderId = ws.folderId;
-        cs.folderName = ws.folderName;
-        cs.fileId = ws.fileId;
-        cs.fileName = ws.fileName;
-        cs.fileWebLink = ws.fileWebLink;
-
-        const email = (this.coupleSyncPartnerEmail || '').trim().toLowerCase();
-        if (email) {
-          await BabySync.shareWithPartner(token, ws.folderId, ws.fileId, email);
-          cs.partnerEmail = email;
-        }
-        this.state.settings.coupleSync = cs;
-
-        // Subir primera fusión/snapshot al archivo compartido
-        const res = await BabySync.syncWithDrive(this.state, () => this.ensureDriveAccessToken());
-        this.state = res.state;
-        this.applyTheme(this.state.settings.genderMode || 'SURPRISE');
-        await this.persist();
-        this.notify(email ? `Carpeta creada y compartida con ${email}` : 'Carpeta compartida creada en tu Drive.');
-      } catch (err) {
-        if (err?.status === 401) this.coupleSyncAccessToken = '';
-        this.coupleSyncError = err?.message || String(err);
-      } finally {
-        this.coupleSyncBusy = false;
-      }
-    },
-
-    async pickPartnerSharedFile() {
-      this.coupleSyncBusy = true;
-      this.coupleSyncError = '';
-      try {
-        const token = await this.ensureDriveAccessToken();
-        const picked = await BabySync.openPartnerFilePicker(token);
-        if (!picked?.ok) {
-          if (picked?.canceled) return;
-          this.coupleSyncError = picked?.error || 'No se pudo seleccionar el archivo compartido.';
-          return;
-        }
-        const cs = this.state.settings.coupleSync || BabySync.createDefaultCoupleSync();
-        cs.role = 'PARTNER';
-        cs.fileId = picked.fileId;
-        cs.fileName = picked.fileName || 'babytrack-pareja.json';
-        cs.fileWebLink = picked.fileWebLink || '';
-        this.state.settings.coupleSync = cs;
-
-        const res = await BabySync.syncWithDrive(this.state, () => this.ensureDriveAccessToken());
-        this.state = res.state;
-        this.applyTheme(this.state.settings.genderMode || 'SURPRISE');
-        await this.persist();
-        this.notify('¡Celular vinculado y sincronizado con tu pareja!');
-      } catch (err) {
-        if (err?.status === 401) this.coupleSyncAccessToken = '';
-        this.coupleSyncError = err?.message || String(err);
-      } finally {
-        this.coupleSyncBusy = false;
-      }
-    },
-
-    async runCoupleSyncNow() {
-      this.coupleSyncBusy = true;
-      this.coupleSyncError = '';
-      try {
-        const res = await BabySync.syncWithDrive(this.state, () => this.ensureDriveAccessToken());
-        this.state = res.state;
-        this.applyTheme(this.state.settings.genderMode || 'SURPRISE');
-        await this.persist();
-        this.notify(`Sincronizado: ${this.state.settings.coupleSync.lastSyncSummary || 'Todo al día'}`);
-      } catch (err) {
-        if (err?.status === 401) this.coupleSyncAccessToken = '';
-        this.coupleSyncError = err?.message || String(err);
-      } finally {
-        this.coupleSyncBusy = false;
-      }
-    },
-
-    shareCoupleInviteWhatsApp() {
-      const cs = this.coupleSyncInfo || {};
-      const baby = this.state.settings.babyNickname || 'Nuestro Bebé';
-      const fileLabel = cs.fileName || 'babytrack-pareja.json';
-      const linkLine = cs.fileWebLink ? `\nEnlace Drive: ${cs.fileWebLink}` : '';
-      const msg =
-        `💑 ¡Te compartí nuestro diario de ${baby} en BabyTrack!\n` +
-        `1. Abre BabyTrack en tu celular.\n` +
-        `2. Entra a "Sincronizar en Pareja" y conecta tu cuenta Google.\n` +
-        `3. Elige el archivo compartido "${fileLabel}" para unir nuestras citas, compras, cartas y ecos.${linkLine}`;
-      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-    },
-
-    async importAndMergePartnerJson(e) {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      this.coupleSyncError = '';
-      try {
-        const text = await file.text();
-        const parsed = JSON.parse(text);
-        if (!parsed || !parsed.settings) throw new Error('Archivo inválido para fusionar.');
-        const { state: merged, stats } = BabySync.mergeStates(this.state, parsed);
-        merged.settings.coupleSync.lastSyncAt = new Date().toISOString();
-        merged.settings.coupleSync.lastSyncSummary = `Fusión manual (+${stats.added} nuevos · ${stats.updated} actualizados)`;
-        this.state = merged;
-        this.applyTheme(this.state.settings.genderMode || 'SURPRISE');
-        await this.persist();
-        this.notify(`¡Datos fusionados sin perder nada! (+${stats.added} nuevos, ${stats.updated} actualizados)`);
-      } catch (err) {
-        this.coupleSyncError = err?.message || String(err);
-      } finally {
-        if (e.target) e.target.value = '';
-      }
-    },
-
-    async unlinkCoupleSync() {
-      if (!confirm('¿Desvincular este teléfono de Google Drive? Tus datos guardados localmente NO se borrarán.')) return;
-      this.coupleSyncAccessToken = '';
-      this.coupleSyncError = '';
-      if (window.BabyNative && typeof window.BabyNative.signOutGoogleDrive === 'function') {
-        await window.BabyNative.signOutGoogleDrive();
-      }
-      const prevDeviceId = this.state?.settings?.coupleSync?.deviceId;
-      this.state.settings.coupleSync = BabySync.createDefaultCoupleSync();
-      if (prevDeviceId) this.state.settings.coupleSync.deviceId = prevDeviceId;
-      this.coupleSyncPartnerEmail = '';
-      await this.persist();
-      this.notify('Sincronización desvinculada. Tus datos siguen seguros en tu teléfono.');
     },
 
     // --- EXPORTACIÓN DUAL (CRUDO GRATIS vs LIBRO DE ORO $49 MXN) + RESPALDO JSON ---
@@ -1049,9 +780,7 @@ function babyTrackApp() {
         const text = await file.text();
         const parsed = JSON.parse(text);
         if (!parsed.settings) throw new Error('Archivo de respaldo inválido');
-        const hydrated = Object.assign(BabyDB.createDefaultState(), parsed);
-        if (window.BabySync) BabySync.ensureSyncMetadata(hydrated);
-        this.state = hydrated;
+        this.state = Object.assign(BabyDB.createDefaultState(), parsed);
         this.applyTheme(this.state.settings.genderMode || 'SURPRISE');
         await this.persist();
         this.notify('¡Respaldo restaurado correctamente!');

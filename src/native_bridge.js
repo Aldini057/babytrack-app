@@ -1,9 +1,7 @@
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { AdMob, BannerAdPosition, BannerAdSize, BannerAdPluginEvents } from '@capacitor-community/admob';
-
-const CoupleDrive = registerPlugin('CoupleDrive');
 
 let admobInitialized = false;
 let bannerCreated = false;
@@ -129,39 +127,6 @@ async function shareImageAndText({ title, text, dataUrl, fileName = 'babytrack-t
   return { ok: true, mode: 'web' };
 }
 
-async function authorizeGoogleDrive() {
-  if (!isNative()) {
-    return {
-      ok: false,
-      notNative: true,
-      error: 'La conexión directa con Google Drive funciona en la app Android. En navegador puedes usar la fusión manual con archivo .json.'
-    };
-  }
-  try {
-    const res = await CoupleDrive.authorizeDrive();
-    if (!res?.accessToken) {
-      return { ok: false, error: 'Google no devolvió un token válido.' };
-    }
-    return {
-      ok: true,
-      accessToken: res.accessToken,
-      grantedScopes: res.grantedScopes || []
-    };
-  } catch (err) {
-    const msg = err?.message || String(err);
-    const canceled = err?.code === 'CANCELED' || msg.toLowerCase().includes('cancel');
-    return { ok: false, canceled, error: msg };
-  }
-}
-
-async function signOutGoogleDrive() {
-  if (!isNative()) return { ok: true };
-  try {
-    await CoupleDrive.signOutDrive();
-  } catch {}
-  return { ok: true };
-}
-
 window.BabyNative = {
   isNative,
   initAdMob,
@@ -169,6 +134,4 @@ window.BabyNative = {
   hideBanner,
   onBannerSizeChange,
   shareImageAndText,
-  authorizeGoogleDrive,
-  signOutGoogleDrive,
 };

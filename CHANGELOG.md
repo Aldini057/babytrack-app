@@ -3,6 +3,12 @@
 Este proyecto sigue **SemVer pre-`1.0.0`** (`0.MINOR.PATCH`) y mantiene sincronizado el `versionCode` de Android para permitir actualizar el APK sobre instalaciones previas sin borrar datos locales ni hacer rollbacks limpios desde GitHub Releases.
 
 <!-- CHANGELOG_ENTRIES -->
+## [0.7.0] (build 9) — 2026-11-20
+### Versión Fija 100% Local (Sin Link Familiar ni Modo Pareja)
+- **Eliminación completa del Modo Pareja / Google Drive Sync:** Se removieron `couple_sync.js`, `sync_config.js`, el plugin nativo Android `CoupleDrivePlugin.java`, la dependencia `play-services-auth` y el modal de sincronización en pareja.
+- **Eliminación completa del Link Familiar web (`/familia`):** Se quitó el botón `⚙️ Link Web`, el modal de enlace familiar y la inclusión de URLs en la nube en el texto de WhatsApp; la tarjeta visual PNG sigue funcionando 100% local en el teléfono.
+- **Base fija 100% local-first:** Todos los datos (citas, estudios, ultrasonidos, checklist, diario, álbum y respaldo `.json`) viven únicamente en el teléfono sin depender de servidores ni cuentas externas.
+
 ## [0.6.1] (build 8) — 2026-11-18
 ### Credenciales Google Cloud y Mejora de Google Picker para Sincronización en Pareja
 - **Configuración activa de Google Cloud (`sync_config.js`):** Cargados el Número de Proyecto (`1079143066290`), API Key de Google Picker y Client ID Web para habilitar la selección del archivo compartido `babytrack-pareja.json` en el 2do celular.
