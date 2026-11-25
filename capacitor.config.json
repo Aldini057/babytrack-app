@@ -8,5 +8,12 @@
   "android": {
     "allowMixedContent": false,
     "backgroundColor": "#F3E9DC"
+  },
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": true,
+      "style": "LIGHT",
+      "backgroundColor": "#FFFDF7"
+    }
   }
 }

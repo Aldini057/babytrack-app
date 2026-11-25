@@ -1,11 +1,11 @@
 {
   "name": "babytrack-app",
-  "version": "0.7.0",
-  "androidVersionCode": 9,
+  "version": "0.7.1",
+  "androidVersionCode": 10,
   "description": "BabyTrack App Móvil Comercial (100% Local-First Android/iOS con Capacitor, IndexedDB, Modo Consulta y Libro de Oro PDF)",
   "main": "index.js",
   "scripts": {
-    "build:web": "./scripts/build-web.sh",
+    "build:web": "node scripts/build-web.mjs",
     "cap:sync": "npm run build:web && npx cap sync android",
     "version:bump": "node scripts/bump-version.mjs",
     "test": "node --test tests/test_offline_logic.mjs"
@@ -25,9 +25,11 @@
   "dependencies": {
     "@capacitor-community/admob": "^7.2.0",
     "@capacitor/android": "^7.6.10",
+    "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^7.6.10",
     "@capacitor/filesystem": "^7.1.9",
     "@capacitor/share": "^7.0.4",
+    "@capacitor/status-bar": "^7.0.6",
     "alpinejs": "^3.17.5"
   },
   "devDependencies": {

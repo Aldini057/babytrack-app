@@ -21,14 +21,15 @@ window.BabyExport = (() => {
 <meta charset="UTF-8">
 <title>Expediente Clínico Crudo - BabyTrack</title>
 <style>
-  body { font-family: Arial, sans-serif; color: #111; padding: 24px; line-height: 1.4; max-width: 800px; margin: 0 auto; }
+  @page { size: letter; margin: 15mm; }
+  body { font-family: Arial, sans-serif; color: #111; padding: 20px; line-height: 1.4; max-width: 800px; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   h1 { font-size: 18px; border-bottom: 2px solid #000; padding-bottom: 6px; }
   h2 { font-size: 14px; margin-top: 18px; border-bottom: 1px solid #888; padding-bottom: 3px; text-transform: uppercase; }
   table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
   th, td { border: 1px solid #999; padding: 6px; text-align: left; }
   th { background: #eee; }
   .meta { font-size: 12px; margin-bottom: 12px; }
-  @media print { .no-print { display: none; } }
+  @media print { .no-print { display: none !important; } body { padding: 0; } }
 </style>
 </head>
 <body>
@@ -114,16 +115,57 @@ window.BabyExport = (() => {
       ...parentNotes.map(n => ({ week: n.gestationalWeek, day: n.gestationalDay, date: (n.createdAt || '').slice(0, 10), kind: n.authorRole === 'MAMA' ? '💌 Carta de Mamá' : '💙 Carta de Papá', title: n.title, body: n.content, images: n.attachedImageDataUrl ? [n.attachedImageDataUrl] : [] }))
     ].sort((a, b) => a.week - b.week || a.day - b.day);
 
+    const previewWatermarkCss = isPreview ? `
+  .preview-watermark-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+    overflow: hidden;
+  }
+  .preview-watermark-stamp {
+    font-family: Arial, sans-serif;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(180, 83, 9, 0.16);
+    border: 2px dashed rgba(180, 83, 9, 0.22);
+    padding: 8px 18px;
+    border-radius: 12px;
+    transform: rotate(-22deg);
+    white-space: nowrap;
+    user-select: none;
+  }` : '';
+
+    const previewBannerHtml = isPreview
+      ? `<div class="watermark">
+          <span>🔒 <strong>VISTA PREVIA CON MARCA DE AGUA</strong> · Desbloquea el Libro de Oro ($49 MXN) para imprimir o guardar en PDF sin marca de agua.</span>
+        </div>
+        <div class="preview-watermark-layer" aria-hidden="true">
+          <div class="preview-watermark-stamp">VISTA PREVIA · BABYTRACK · $49 MXN</div>
+          <div class="preview-watermark-stamp">MUESTRA NO IMPRIMIBLE · LIBRO DE ORO</div>
+          <div class="preview-watermark-stamp">VISTA PREVIA · BABYTRACK · $49 MXN</div>
+        </div>`
+      : `<div class="watermark no-print">
+          <span>✨ Edición Editorial Desbloqueada — Lista para Imprimir o Guardar como PDF</span>
+        </div>`;
+
     return `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>El Libro de Oro de ${esc(s.babyNickname)}</title>
 <style>
   @page { size: letter; margin: 16mm; }
-  body { font-family: Georgia, "Times New Roman", serif; color: #3A2E28; background: ${accents.bg}; margin: 0 auto; max-width: 820px; padding: 20px; }
+  body { position: relative; font-family: Georgia, "Times New Roman", serif; color: #3A2E28; background: ${accents.bg}; margin: 0 auto; max-width: 820px; padding: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .cover { position: relative; background: ${accents.paper}; border: 2px dashed ${accents.border}; outline: 6px solid ${accents.paper}; border-radius: 20px; padding: 52px 32px; text-align: center; margin-bottom: 32px; page-break-after: always; box-shadow: 0 10px 26px rgba(58,46,40,0.12); }
-  .cover h1 { font-size: 32px; color: ${accents.accent}; margin: 14px 0 8px; }
+  .cover h1 { font-size: 30px; color: ${accents.accent}; margin: 14px 0 8px; }
   .cover .sub { font-size: 16px; color: #7D6E65; font-style: italic; }
   .tape { display: inline-block; width: 120px; height: 22px; background: ${accents.tape}; transform: rotate(-2deg); margin-bottom: 14px; }
   .badge { display: inline-block; padding: 6px 16px; border-radius: 999px; background: ${accents.soft}; color: ${accents.accent}; border: 1.5px dashed ${accents.accent}; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; }
@@ -135,15 +177,13 @@ window.BabyExport = (() => {
   .gallery img { width: 100%; max-height: 240px; object-fit: cover; border-radius: 6px; padding: 6px 6px 18px 6px; background: #FFFDF9; border: 1px solid ${accents.border}; box-shadow: 0 6px 14px rgba(58,46,40,0.12); box-sizing: border-box; }
   .family-box { background: #FEF5D4; border: 2px dashed #C7A459; border-radius: 16px; padding: 20px; margin-top: 24px; break-inside: avoid; }
   .footprint { background: ${accents.paper}; border: 2px dashed ${accents.accent}; border-radius: 20px; padding: 32px; text-align: center; margin-top: 28px; page-break-before: always; }
-  .watermark { background: #FEF3C7; color: #92400E; padding: 10px 14px; border-radius: 10px; font-family: Arial, sans-serif; font-size: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-  @media print { body { background: #fff; } .no-print { display: none !important; } }
+  .watermark { background: #FEF3C7; color: #92400E; border: 1px dashed #D97706; padding: 10px 14px; border-radius: 10px; font-family: Arial, sans-serif; font-size: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+  ${previewWatermarkCss}
+  @media print { body { background: #fff; padding: 0; } .no-print { display: none !important; } }
 </style>
 </head>
 <body>
-  <div class="watermark no-print">
-    <span>${isPreview ? '👀 Vista Previa del Libro de Oro ($49 MXN para versión final sin aviso)' : '✨ Edición Editorial Lista para Imprimir — BabyTrack'}</span>
-    <button onclick="window.print()" style="padding:8px 14px;background:${accents.accent};color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">🖨️ Imprimir / Guardar PDF</button>
-  </div>
+  ${previewBannerHtml}
 
   <section class="cover">
     <div class="tape"></div><br>
@@ -201,9 +241,8 @@ window.BabyExport = (() => {
   function openDocumentInTab(htmlContent, filenameFallback) {
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const win = window.open(url, '_blank');
-    if (!win) {
-      // Fallback para WebViews estrictos de Android: descarga directa del documento HTML imprimible
+    const win = typeof window.open === 'function' ? window.open(url, '_blank') : null;
+    if (!win && typeof document !== 'undefined') {
       const a = document.createElement('a');
       a.href = url;
       a.download = filenameFallback;
@@ -214,9 +253,21 @@ window.BabyExport = (() => {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 
+  async function printDocument(htmlContent, jobName = 'BabyTrack-PDF', options = {}) {
+    if (options.requireUnlock && !options.isUnlocked) {
+      return { ok: false, locked: true, error: 'El Libro de Oro debe estar desbloqueado para imprimir o guardar en PDF.' };
+    }
+    if (window.BabyNative && typeof window.BabyNative.printHtml === 'function') {
+      return await window.BabyNative.printHtml({ html: htmlContent, jobName });
+    }
+    openDocumentInTab(htmlContent, `${jobName}.html`);
+    return { ok: true, mode: 'tab' };
+  }
+
   return {
     buildRawClinicalHtml,
     buildMemoryBookHtml,
-    openDocumentInTab
+    openDocumentInTab,
+    printDocument
   };
 })();

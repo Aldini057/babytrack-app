@@ -3,6 +3,15 @@
 Este proyecto sigue **SemVer pre-`1.0.0`** (`0.MINOR.PATCH`) y mantiene sincronizado el `versionCode` de Android para permitir actualizar el APK sobre instalaciones previas sin borrar datos locales ni hacer rollbacks limpios desde GitHub Releases.
 
 <!-- CHANGELOG_ENTRIES -->
+## [0.7.1] (build 10) — 2026-11-24
+### Fase 1 — Impresión Nativa PDF, Vista Previa con Marca de Agua, Exportación Nativa, Botón Atrás e Insets Android 15
+- **Plugin nativo Android `BabyPrintPlugin` (`android.print.PrintManager`):** Registrado en `MainActivity.java` y conectado a `src/native_bridge.js`, `www/js/export_pdf.js` y `www/js/app.js` para imprimir o guardar como PDF real tanto el Reporte Clínico Obstétrico gratuito como El Libro de Oro del Embarazo.
+- **Modal interno de Vista Previa del Libro de Oro con marca de agua:** Permite recorrer todo el Libro de Oro dentro de la app con sellos de marca de agua en modo gratuito, habilitando `PrintManager` (sin marca de agua) únicamente cuando `premiumBookUnlocked` está activo.
+- **Exportación nativa de respaldos `.json` y citas `.ics`:** Integración de `@capacitor/filesystem` + `@capacitor/share` (`BabyNative.exportTextFile`) para guardar o compartir archivos reales desde el teléfono sin depender de descargas `blob:` del WebView.
+- **Navegación natural con botón/gesto físico "Atrás" (`@capacitor/app`):** Jerarquía progresiva: cierra visores de pantalla completa (`viewerItem`, vista previa del Libro de Oro) -> cierra modales y drawers abiertos -> regresa a la pestaña `Inicio` -> sale limpiamente de la app.
+- **Márgenes seguros Edge-to-Edge en Android 15 (SDK 35):** Integración de `@capacitor/status-bar` (iconos oscuros sobre papel Scrapbook) y `ViewCompat.setOnApplyWindowInsetsListener` (`systemBars | displayCutout | ime`) en `MainActivity.java`.
+- **Documentación y build multiplataforma:** Guardado el Plan Maestro de 6 fases hacia `v1.0.0` en `docs/PLAN_LANZAMIENTO.md` y script `scripts/build-web.mjs` compatible con Windows y Linux CI.
+
 ## [0.7.0] (build 9) — 2026-11-20
 ### Versión Fija 100% Local (Sin Link Familiar ni Modo Pareja)
 - **Eliminación completa del Modo Pareja / Google Drive Sync:** Se removieron `couple_sync.js`, `sync_config.js`, el plugin nativo Android `CoupleDrivePlugin.java`, la dependencia `play-services-auth` y el modal de sincronización en pareja.

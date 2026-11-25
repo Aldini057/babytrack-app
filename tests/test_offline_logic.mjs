@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const wwwJsDir = path.resolve(__dirname, '../www/js');
 
-function loadBrowserScripts() {
+function loadBrowserScripts(customGlobals = {}) {
   const sandbox = {
     window: {},
     console,
@@ -19,6 +19,11 @@ function loadBrowserScripts() {
     Blob,
     URL,
     encodeURIComponent,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    ...customGlobals,
   };
   sandbox.window = sandbox;
 
@@ -97,10 +102,24 @@ test('BabyCalendar builds Google Calendar URL and .ics with 24h and 2h VALARM', 
   const gUrl = BabyCalendar.buildGoogleCalendarUrl(appt, 'Santi');
   assert.match(gUrl, /calendar\.google\.com\/calendar\/render/);
   assert.match(gUrl, /Santi/);
+
+  const ics = BabyCalendar.buildSingleIcs(appt, 'Santi');
+  assert.match(ics, /BEGIN:VCALENDAR/);
+  assert.match(ics, /TRIGGER:-PT1440M/);
+  assert.match(ics, /TRIGGER:-PT120M/);
 });
 
-test('BabyExport builds both Free Raw Clinical HTML and Editorial Memory Book HTML', () => {
-  const { BabyDB, BabyCalc, BabyExport } = loadBrowserScripts();
+test('BabyExport builds Clinical HTML, watermarked Preview Book, and clean Unlocked Book', async () => {
+  const printCalls = [];
+  const { BabyDB, BabyCalc, BabyExport } = loadBrowserScripts({
+    BabyNative: {
+      isNative: () => true,
+      printHtml: async (payload) => {
+        printCalls.push(payload);
+        return { ok: true, mode: 'native', jobName: payload.jobName };
+      }
+    }
+  });
   const state = BabyDB.createDefaultState();
   state.settings.babyNickname = 'Lucía';
   state.appointments.push({
@@ -129,10 +148,36 @@ test('BabyExport builds both Free Raw Clinical HTML and Editorial Memory Book HT
   assert.match(rawHtml, /REPORTE CLÍNICO OBSTÉTRICO/);
   assert.match(rawHtml, /61\.5 kg/);
 
+  // Vista previa gratuita lleva marca de agua y ningún botón window.print()
+  const previewHtml = BabyExport.buildMemoryBookHtml(state, metrics, true);
+  assert.match(previewHtml, /VISTA PREVIA CON MARCA DE AGUA/);
+  assert.match(previewHtml, /preview-watermark-stamp/);
+  assert.doesNotMatch(previewHtml, /window\.print\(\)/);
+
+  // Versión desbloqueada va limpia sin sellos de marca de agua
   const bookHtml = BabyExport.buildMemoryBookHtml(state, metrics, false);
   assert.match(bookHtml, /Nuestra Dulce Espera/);
   assert.match(bookHtml, /Lucía/);
   assert.match(bookHtml, /Abuelita Carmen/);
+  assert.doesNotMatch(bookHtml, /VISTA PREVIA CON MARCA DE AGUA/);
+
+  // Bloqueo estricto si no está desbloqueado
+  const lockedRes = await BabyExport.printDocument(previewHtml, 'Libro-Bloqueado', {
+    requireUnlock: true,
+    isUnlocked: false
+  });
+  assert.equal(lockedRes.ok, false);
+  assert.equal(lockedRes.locked, true);
+  assert.equal(printCalls.length, 0);
+
+  // Impresión habilitada cuando está desbloqueado
+  const unlockedRes = await BabyExport.printDocument(bookHtml, 'Libro-Lucia', {
+    requireUnlock: true,
+    isUnlocked: true
+  });
+  assert.equal(unlockedRes.ok, true);
+  assert.equal(printCalls.length, 1);
+  assert.equal(printCalls[0].jobName, 'Libro-Lucia');
 });
 
 test('Version consistency across package.json, build.gradle, and www/js/version.js', () => {
@@ -184,13 +229,11 @@ test('babyTrackApp checklist tracks real purchase cost, gifts ($0), and uncheck 
   const firstItem = app.state.checklist[0]; // est: 4500
   const secondItem = app.state.checklist[1]; // est: 650
 
-  // Seleccionar artículo abre modal con costo estimado por defecto
   await app.handleChecklistToggle(firstItem);
   assert.equal(app.showChecklistCostModal, true);
   assert.equal(firstItem.isCompleted, false);
   assert.equal(app.checklistCostForm.actualCostMxn, 4500);
 
-  // Usuario ajusta a lo que realmente pagó (3900)
   app.checklistCostForm.actualCostMxn = 3900;
   await app.confirmChecklistCost();
   assert.equal(firstItem.isCompleted, true);
@@ -198,7 +241,6 @@ test('babyTrackApp checklist tracks real purchase cost, gifts ($0), and uncheck 
   assert.equal(app.checklistStats.act, 3900);
   assert.equal(app.checklistStats.diff, -600);
 
-  // Segundo artículo fue regalo ($0)
   await app.handleChecklistToggle(secondItem);
   app.checklistCostForm.actualCostMxn = 0;
   await app.confirmChecklistCost();
@@ -207,9 +249,118 @@ test('babyTrackApp checklist tracks real purchase cost, gifts ($0), and uncheck 
   assert.equal(app.checklistStats.act, 3900);
   assert.equal(app.checklistStats.diff, -1250);
 
-  // Desmarcar reinicia actualCostMxn a 0 para no contaminar el total gastado
   await app.handleChecklistToggle(firstItem);
   assert.equal(firstItem.isCompleted, false);
   assert.equal(firstItem.actualCostMxn, 0);
   assert.equal(app.checklistStats.act, 0);
+});
+
+test('Fase 1: Book preview watermark gate, PrintManager, native .json/.ics export, and Back hierarchy', async () => {
+  const printedDocs = [];
+  const exportedFiles = [];
+
+  const sandbox = loadBrowserScripts({
+    BabyNative: {
+      isNative: () => true,
+      initStatusBar: async () => true,
+      syncStatusBarTheme: async () => true,
+      registerBackHandler: async () => true,
+      printHtml: async ({ html, jobName }) => {
+        printedDocs.push({ html, jobName });
+        return { ok: true, mode: 'native', jobName };
+      },
+      exportTextFile: async (opts) => {
+        exportedFiles.push(opts);
+        return { ok: true, mode: 'native', uri: `file:///cache/${opts.fileName}` };
+      }
+    }
+  });
+  sandbox.BabyDB.saveState = async () => true;
+  const appCode = fs.readFileSync(path.join(wwwJsDir, 'app.js'), 'utf-8');
+  vm.runInNewContext(appCode, sandbox, { filename: 'app.js' });
+
+  const app = sandbox.babyTrackApp();
+  app.notify = () => {};
+  app.state.settings.onboarded = true;
+  app.state.settings.babyNickname = 'Mateo';
+
+  // 1. Reporte clínico gratuito imprime vía PrintManager directamente
+  await app.downloadRawClinicalReport();
+  assert.equal(printedDocs.length, 1);
+  assert.match(printedDocs[0].jobName, /^Expediente-Clinico-/);
+
+  // 2. Libro de Oro bloqueado: abre modal interno con marca de agua y NO invoca PrintManager
+  const lockAttempt = await app.printMemoryBook();
+  assert.equal(lockAttempt.locked, true);
+  assert.equal(app.showBookPreviewModal, true);
+  assert.match(app.bookPreviewHtml, /VISTA PREVIA CON MARCA DE AGUA/);
+  assert.equal(printedDocs.length, 1);
+
+  // 3. Al desbloquear el Libro de Oro: quita marca de agua y lanza PrintManager
+  await app.unlockMemoryBookDemo();
+  assert.equal(app.state.settings.premiumBookUnlocked, true);
+  assert.doesNotMatch(app.bookPreviewHtml, /VISTA PREVIA CON MARCA DE AGUA/);
+  assert.equal(printedDocs.length, 2);
+  assert.match(printedDocs[1].jobName, /^Libro-de-Oro-Mateo-/);
+
+  // 4. Exportación nativa de respaldo .json y cita .ics
+  await app.exportFullJsonBackup();
+  await app.downloadIcsFor({
+    id: 42,
+    appointmentType: 'MEDICO',
+    appointmentDate: '2026-12-20T09:00',
+    doctorOrClinic: 'Dra. Elena',
+    gestationalWeek: 18,
+    gestationalDay: 3,
+    reminderMinutesBefore: 1440
+  });
+  assert.equal(exportedFiles.length, 2);
+  assert.match(exportedFiles[0].fileName, /^respaldo-babytrack-.*\.json$/);
+  assert.equal(exportedFiles[1].fileName, 'cita-babytrack-42.ics');
+  assert.match(exportedFiles[1].content, /BEGIN:VCALENDAR/);
+
+  // 5. Jerarquía del botón físico "Atrás": visor -> vista previa libro -> modal -> pestaña Inicio -> salir
+  app.activeTab = 'diario';
+  app.showJournalModal = true;
+  app.showBookPreviewModal = true;
+  app.viewerItem = { fileCategory: 'IMAGE', dataUrl: 'data:image/png;base64,AA==' };
+
+  assert.equal(app.handleBackAction(), true);
+  assert.equal(app.viewerItem, null);
+  assert.equal(app.showBookPreviewModal, true);
+
+  assert.equal(app.handleBackAction(), true);
+  assert.equal(app.showBookPreviewModal, false);
+  assert.equal(app.showJournalModal, true);
+
+  assert.equal(app.handleBackAction(), true);
+  assert.equal(app.showJournalModal, false);
+  assert.equal(app.activeTab, 'diario');
+
+  assert.equal(app.handleBackAction(), true);
+  assert.equal(app.activeTab, 'inicio');
+
+  assert.equal(app.handleBackAction(), false);
+});
+
+test('Android native PrintManager plugin and SDK 35 WindowInsets are wired in MainActivity', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const pluginJava = fs.readFileSync(
+    path.join(rootDir, 'android/app/src/main/java/com/babytrack/app/BabyPrintPlugin.java'),
+    'utf-8'
+  );
+  const mainJava = fs.readFileSync(
+    path.join(rootDir, 'android/app/src/main/java/com/babytrack/app/MainActivity.java'),
+    'utf-8'
+  );
+
+  assert.match(pluginJava, /@CapacitorPlugin\(name = "BabyPrint"\)/);
+  assert.match(pluginJava, /PrintManager/);
+  assert.match(pluginJava, /createPrintDocumentAdapter/);
+
+  const regIdx = mainJava.indexOf('registerPlugin(BabyPrintPlugin.class)');
+  const superIdx = mainJava.indexOf('super.onCreate(savedInstanceState)');
+  assert.ok(regIdx !== -1 && superIdx !== -1 && regIdx < superIdx, 'registerPlugin must be called before super.onCreate');
+  assert.match(mainJava, /WindowInsetsCompat\.Type\.systemBars\(\)/);
+  assert.match(mainJava, /setOnApplyWindowInsetsListener/);
 });

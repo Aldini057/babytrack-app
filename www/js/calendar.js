@@ -82,21 +82,38 @@ window.BabyCalendar = (() => {
     ].join('\r\n');
   }
 
-  function downloadIcs(appt, babyNickname) {
+  async function downloadIcs(appt, babyNickname) {
     const content = buildSingleIcs(appt, babyNickname);
+    const fileName = `cita-babytrack-${appt.id}.ics`;
+
+    if (window.BabyNative && typeof window.BabyNative.exportTextFile === 'function') {
+      return await window.BabyNative.exportTextFile({
+        content,
+        fileName,
+        mimeType: 'text/calendar;charset=utf-8',
+        title: `Cita BabyTrack · ${appt.doctorOrClinic || babyNickname || ''}`.trim(),
+        text: `Recordatorio de cita prenatal (${appt.doctorOrClinic || 'BabyTrack'})`,
+        dialogTitle: 'Agregar cita a tu Calendario o compartir (.ics)',
+      });
+    }
+
     const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `cita-babytrack-${appt.id}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    if (typeof document !== 'undefined') {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return { ok: true, mode: 'web' };
   }
 
   return {
     buildGoogleCalendarUrl,
+    buildSingleIcs,
     downloadIcs
   };
 })();

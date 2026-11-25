@@ -258,6 +258,6 @@ body[data-theme="GIRL"] {
   .polaroid-tilt-left, .polaroid-tilt-right { transform: none; }
 }
 
-/* Safe areas for Android 14 / Edge-to-edge / Notches */
-.pt-safe { padding-top: max(env(safe-area-inset-top), 0.75rem); }
-.pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0.5rem); }
+/* Safe areas for Android 14 / 15 Edge-to-edge / Notches */
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }

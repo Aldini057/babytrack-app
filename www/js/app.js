@@ -24,6 +24,8 @@ function babyTrackApp() {
     showChecklistCostModal: false,
     showJournalModal: false,
     showMomentModal: false,
+    showBookPreviewModal: false,
+    bookPreviewHtml: '',
     viewerItem: null,
 
     // Tarjeta visual de WhatsApp
@@ -65,6 +67,14 @@ function babyTrackApp() {
       this.momentForm.momentDate = today;
       this.loaded = true;
 
+      if (window.BabyNative && typeof window.BabyNative.initStatusBar === 'function') {
+        window.BabyNative.initStatusBar(this.state.settings.genderMode || 'SURPRISE');
+      }
+
+      if (window.BabyNative && typeof window.BabyNative.registerBackHandler === 'function') {
+        window.BabyNative.registerBackHandler(() => this.handleBackAction());
+      }
+
       if (window.BabyNative && typeof window.BabyNative.onBannerSizeChange === 'function') {
         window.BabyNative.onBannerSizeChange((height) => {
           this.adBannerHeightPx = this.hideAdsForEthics ? 0 : Math.max(0, Number(height || 0));
@@ -73,6 +83,8 @@ function babyTrackApp() {
 
       this.$watch('hideAdsForEthics', () => this.syncAdBanner());
       this.$watch('showOnboarding', () => this.syncAdBanner());
+      this.$watch('showBookPreviewModal', () => this.syncAdBanner());
+      this.$watch('viewerItem', () => this.syncAdBanner());
       await this.syncAdBanner();
     },
 
@@ -86,7 +98,54 @@ function babyTrackApp() {
     },
 
     applyTheme(mode) {
-      document.body.setAttribute('data-theme', mode || 'SURPRISE');
+      if (typeof document !== 'undefined' && document.body) {
+        document.body.setAttribute('data-theme', mode || 'SURPRISE');
+      }
+      if (window.BabyNative && typeof window.BabyNative.syncStatusBarTheme === 'function') {
+        window.BabyNative.syncStatusBarTheme(mode || 'SURPRISE');
+      }
+    },
+
+    handleBackAction() {
+      // 1. Cerrar visores de pantalla completa primero
+      if (this.viewerItem) {
+        this.viewerItem = null;
+        return true;
+      }
+      if (this.showBookPreviewModal) {
+        this.showBookPreviewModal = false;
+        return true;
+      }
+
+      // 2. Cerrar modales y drawers abiertos
+      const modalFlags = [
+        'showChecklistCostModal',
+        'showConsultationDrawer',
+        'showBookModal',
+        'showTipModal',
+        'showShareCardModal',
+        'showApptModal',
+        'showStudyModal',
+        'showChecklistModal',
+        'showJournalModal',
+        'showMomentModal',
+        'showCalibrateModal'
+      ];
+      for (const flag of modalFlags) {
+        if (this[flag]) {
+          this[flag] = false;
+          return true;
+        }
+      }
+
+      // 3. Regresar a la pestaña Inicio si está en otra sección
+      if (!this.showOnboarding && this.activeTab !== 'inicio') {
+        this.activeTab = 'inicio';
+        return true;
+      }
+
+      // 4. Ya en Inicio sin modales: permitir salida limpia de la app
+      return false;
     },
 
     nextId() {
@@ -150,10 +209,11 @@ function babyTrackApp() {
     },
 
     get hideAdsForEthics() {
-      // Regla de oro ética: nunca mostrar banner en Modo Consulta Médica, Cronómetro de Contracciones, Onboarding o si ya se desbloqueó
+      // Regla de oro ética: nunca mostrar banner en Modo Consulta Médica, Cronómetro de Contracciones, visores de pantalla completa, Onboarding o si ya se desbloqueó
       if (this.state.settings.adsRemoved || this.state.settings.premiumBookUnlocked) return true;
       if (this.showOnboarding) return true;
       if (this.showConsultationDrawer) return true;
+      if (this.showBookPreviewModal || this.viewerItem) return true;
       if (this.activeTab === 'medico' && this.medicalSubTab === 'bienestar' && this.contractionTimer.active) return true;
       return false;
     },
@@ -337,8 +397,12 @@ function babyTrackApp() {
       window.open(BabyCalendar.buildGoogleCalendarUrl(appt, this.state.settings.babyNickname), '_blank');
     },
 
-    downloadIcsFor(appt) {
-      BabyCalendar.downloadIcs(appt, this.state.settings.babyNickname);
+    async downloadIcsFor(appt) {
+      const res = await BabyCalendar.downloadIcs(appt, this.state.settings.babyNickname);
+      if (res?.ok) {
+        this.notify(res.mode === 'native' ? 'Elige tu Calendario o dónde guardar la cita (.ics).' : 'Recordatorio .ics descargado.');
+      }
+      return res;
     },
 
     // --- ESTUDIOS, CONSULTAS, LAB Y ECOS (COMPRIMIDOS EN EL DISPOSITIVO) ---
@@ -723,23 +787,60 @@ function babyTrackApp() {
     },
 
     // --- EXPORTACIÓN DUAL (CRUDO GRATIS vs LIBRO DE ORO $49 MXN) + RESPALDO JSON ---
-    downloadRawClinicalReport() {
+    async downloadRawClinicalReport() {
       const html = BabyExport.buildRawClinicalHtml(this.state, this.metrics);
-      BabyExport.openDocumentInTab(html, `expediente-clinico-babytrack-${BabyCalc.localIsoDate()}.html`);
+      const jobName = `Expediente-Clinico-${BabyCalc.localIsoDate()}`;
+      const res = await BabyExport.printDocument(html, jobName);
+      if (res?.ok) {
+        this.notify(res.mode === 'native' ? 'Selecciona Guardar como PDF o tu impresora.' : 'Abriendo vista de impresión del reporte clínico...');
+      } else if (res?.error) {
+        this.notify(res.error);
+      }
+      return res;
     },
 
     openMemoryBook(previewOnly = false) {
-      const html = BabyExport.buildMemoryBookHtml(this.state, this.metrics, previewOnly && !this.state.settings.premiumBookUnlocked);
-      BabyExport.openDocumentInTab(html, `libro-de-oro-${BabyCalc.localIsoDate()}.html`);
+      if (!previewOnly && this.state.settings.premiumBookUnlocked) {
+        return this.printMemoryBook();
+      }
+      const isWatermarked = !this.state.settings.premiumBookUnlocked;
+      this.bookPreviewHtml = BabyExport.buildMemoryBookHtml(this.state, this.metrics, isWatermarked);
+      this.showBookModal = false;
+      this.showBookPreviewModal = true;
+      return { ok: true, mode: 'preview', watermarked: isWatermarked };
+    },
+
+    async printMemoryBook() {
+      if (!this.state.settings.premiumBookUnlocked) {
+        this.openMemoryBook(true);
+        this.notify('Desbloquea el Libro de Oro ($49 MXN) para imprimir o guardar el PDF sin marca de agua.');
+        return { ok: false, locked: true };
+      }
+      const html = BabyExport.buildMemoryBookHtml(this.state, this.metrics, false);
+      const cleanBaby = (this.state.settings.babyNickname || 'BabyTrack').replace(/[^0-9A-Za-zÁÉÍÓÚáéíóúÑñ_-]+/g, '-');
+      const jobName = `Libro-de-Oro-${cleanBaby}-${BabyCalc.localIsoDate()}`;
+      const res = await BabyExport.printDocument(html, jobName, {
+        requireUnlock: true,
+        isUnlocked: true
+      });
+      if (res?.ok) {
+        this.notify(res.mode === 'native' ? 'Selecciona Guardar como PDF o tu impresora.' : 'Preparando PDF del Libro de Oro...');
+      } else if (res?.error) {
+        this.notify(res.error);
+      }
+      return res;
     },
 
     async unlockMemoryBookDemo() {
       this.state.settings.premiumBookUnlocked = true;
       this.state.settings.adsRemoved = true;
       this.showBookModal = false;
+      if (this.showBookPreviewModal) {
+        this.bookPreviewHtml = BabyExport.buildMemoryBookHtml(this.state, this.metrics, false);
+      }
       await this.persist();
       this.notify('¡Libro de Oro desbloqueado y anuncios eliminados!');
-      this.openMemoryBook(false);
+      return await this.printMemoryBook();
     },
 
     async supportWithTip(amountMxn) {
@@ -760,17 +861,37 @@ function babyTrackApp() {
       }
     },
 
-    exportFullJsonBackup() {
-      const blob = new Blob([JSON.stringify(this.state, null, 2)], { type: 'application/json' });
+    async exportFullJsonBackup() {
+      const content = JSON.stringify(this.state, null, 2);
+      const fileName = `respaldo-babytrack-${BabyCalc.localIsoDate()}.json`;
+      if (window.BabyNative && typeof window.BabyNative.exportTextFile === 'function') {
+        const res = await window.BabyNative.exportTextFile({
+          content,
+          fileName,
+          mimeType: 'application/json;charset=utf-8',
+          title: `Respaldo BabyTrack · ${this.state.settings.babyNickname}`,
+          text: `Respaldo completo de BabyTrack (${BabyCalc.localIsoDate()})`,
+          dialogTitle: 'Guardar o compartir respaldo .json'
+        });
+        if (res?.ok) {
+          this.notify(res.mode === 'native' ? 'Elige dónde guardar o enviar tu respaldo .json.' : 'Respaldo local descargado.');
+        }
+        return res;
+      }
+
+      const blob = new Blob([content], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `respaldo-babytrack-${BabyCalc.localIsoDate()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      if (typeof document !== 'undefined') {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
       setTimeout(() => URL.revokeObjectURL(url), 2000);
       this.notify('Respaldo local descargado.');
+      return { ok: true, mode: 'web' };
     },
 
     async importJsonBackup(e) {

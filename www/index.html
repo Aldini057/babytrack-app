@@ -199,7 +199,7 @@
         </div>
         <div class="grid grid-cols-2 gap-2">
           <button @click="downloadRawClinicalReport()" class="py-2 px-2.5 rounded-xl bg-theme-kraft text-theme-ink border border-theme text-xs font-bold">📄 Clínico Crudo (Gratis)</button>
-          <button @click="showBookModal = true" class="py-2 px-2.5 rounded-xl bg-theme-primary text-white text-xs font-bold shadow-2xs">✨ Libro de Oro ($49)</button>
+          <button @click="showBookModal = true" class="py-2 px-2.5 rounded-xl bg-theme-primary text-white text-xs font-bold shadow-2xs" x-text="state.settings.premiumBookUnlocked ? '✨ Libro de Oro (PDF)' : '✨ Libro de Oro ($49)'"></button>
         </div>
       </div>
 
@@ -622,18 +622,55 @@
   <!-- Modal Libro de Oro ($49 MXN) -->
   <div x-show="showBookModal" x-cloak class="fixed inset-0 z-50 bg-[#2A201B]/60 flex items-center justify-center p-4">
     <div @click.outside="showBookModal = false" class="scrapbook-card washi-tape max-w-md w-full p-5 pt-6 space-y-3">
-      <h3 class="text-base font-bold font-serif-editorial text-theme-ink">✨ El Libro de Oro del Embarazo</h3>
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="text-base font-bold font-serif-editorial text-theme-ink">✨ El Libro de Oro del Embarazo</h3>
+        <span x-show="state.settings.premiumBookUnlocked" class="scrapbook-stamp px-2 py-0.5 text-[10px] font-extrabold">Desbloqueado</span>
+      </div>
       <p class="text-xs text-theme-muted">Genera un PDF ilustrado por capítulos y semanas con tus ecos, fotos, cartas de Mamá y Papá y hoja final de huellitas, listo para imprimir y empastar.</p>
-      <div class="sticky-note p-3 text-xs space-y-1">
+      <div x-show="!state.settings.premiumBookUnlocked" class="sticky-note p-3 text-xs space-y-1">
         <p class="font-extrabold text-amber-950">Incluye de regalo:</p>
         <p class="text-amber-900">✓ Desbloqueo permanente por un único pago de <strong>$49 MXN</strong>.</p>
         <p class="text-amber-900">✓ Eliminación para siempre del banner inferior de anuncios.</p>
       </div>
-      <div class="grid grid-cols-2 gap-2">
+      <div x-show="!state.settings.premiumBookUnlocked" class="grid grid-cols-2 gap-2">
         <button @click="openMemoryBook(true)" class="py-2.5 rounded-xl bg-theme-kraft border border-theme text-theme-ink text-xs font-bold">👀 Vista Previa Gratis</button>
         <button @click="unlockMemoryBookDemo()" class="py-2.5 rounded-xl bg-theme-primary text-white text-xs font-extrabold">💳 Desbloquear ($49)</button>
       </div>
+      <div x-show="state.settings.premiumBookUnlocked" class="grid grid-cols-2 gap-2">
+        <button @click="openMemoryBook(true)" class="py-2.5 rounded-xl bg-theme-kraft border border-theme text-theme-ink text-xs font-bold">📖 Ver Libro Completo</button>
+        <button @click="showBookModal = false; printMemoryBook()" class="py-2.5 rounded-xl bg-theme-primary text-white text-xs font-extrabold">🖨️ Imprimir / PDF</button>
+      </div>
       <button @click="showBookModal = false" class="w-full py-1.5 text-xs text-theme-muted font-bold">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- Modal Interno de Vista Previa del Libro de Oro (Con Marca de Agua si no está desbloqueado) -->
+  <div x-show="showBookPreviewModal" x-cloak class="fixed inset-0 z-50 bg-[#2A201B]/90 flex flex-col">
+    <div class="bg-theme-surface border-b-2 border-dashed border-theme px-4 py-2.5 flex items-center justify-between gap-2">
+      <div class="min-w-0">
+        <h3 class="text-sm font-bold font-serif-editorial text-theme-ink truncate" x-text="state.settings.premiumBookUnlocked ? '✨ Libro de Oro · Edición Completa' : '👀 Vista Previa Gratuita · Libro de Oro'"></h3>
+        <p class="text-[10px] font-bold" :class="state.settings.premiumBookUnlocked ? 'text-theme-accent' : 'text-amber-800'" x-text="state.settings.premiumBookUnlocked ? 'Sin marca de agua · Listo para guardar en PDF o imprimir' : 'Muestra con marca de agua · Impresión bloqueada'"></p>
+      </div>
+      <button @click="showBookPreviewModal = false" class="px-2.5 py-1 rounded-xl bg-theme-kraft border border-theme text-xs font-extrabold text-theme-ink">✕ Cerrar</button>
+    </div>
+
+    <div class="relative flex-1 bg-theme-app overflow-hidden">
+      <iframe sandbox="" :srcdoc="bookPreviewHtml" title="Vista previa del Libro de Oro" class="w-full h-full border-0 bg-white"></iframe>
+      <div x-show="!state.settings.premiumBookUnlocked" class="pointer-events-none select-none absolute inset-0 flex flex-col justify-around items-center overflow-hidden p-4" aria-hidden="true">
+        <span class="px-4 py-1.5 rounded-xl border-2 border-dashed border-amber-800/25 text-amber-900/20 font-black text-base tracking-widest uppercase -rotate-12">VISTA PREVIA · BABYTRACK</span>
+        <span class="px-4 py-1.5 rounded-xl border-2 border-dashed border-amber-800/25 text-amber-900/20 font-black text-base tracking-widest uppercase -rotate-12">DESBLOQUEA POR $49 MXN</span>
+      </div>
+    </div>
+
+    <div class="bg-theme-surface border-t-2 border-dashed border-theme p-3 pb-safe">
+      <div x-show="!state.settings.premiumBookUnlocked" class="max-w-lg mx-auto space-y-2">
+        <p class="text-[11px] text-center text-theme-muted">🔒 Desbloquea para quitar la marca de agua, habilitar <strong>Guardar como PDF / Imprimir</strong> y eliminar anuncios.</p>
+        <button @click="unlockMemoryBookDemo()" class="w-full py-3 rounded-2xl bg-theme-primary text-white text-xs font-extrabold shadow-theme">💳 Desbloquear e Imprimir PDF ($49 MXN)</button>
+      </div>
+      <div x-show="state.settings.premiumBookUnlocked" class="max-w-lg mx-auto grid grid-cols-2 gap-2">
+        <button @click="showBookPreviewModal = false" class="py-2.5 rounded-xl bg-theme-kraft border border-theme text-theme-ink text-xs font-bold">Volver</button>
+        <button @click="printMemoryBook()" class="py-2.5 rounded-xl bg-theme-primary text-white text-xs font-extrabold shadow-2xs">🖨️ Imprimir / Guardar PDF</button>
+      </div>
     </div>
   </div>
 
